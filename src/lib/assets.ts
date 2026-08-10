@@ -158,6 +158,37 @@ export function listAnimationsFromJson(jsonText: string): string[] {
   }
 }
 
+/** Spine 4.x: skins is an array of { name, attachments }. Older: object keyed by name. */
+export function listSkinsFromJson(jsonText: string): string[] {
+  try {
+    const data = JSON.parse(jsonText) as {
+      skins?: Array<{ name?: string }> | Record<string, unknown>;
+    };
+    if (!data.skins) return ['default'];
+
+    if (Array.isArray(data.skins)) {
+      const names = data.skins
+        .map((s) => (typeof s?.name === 'string' && s.name.length > 0 ? s.name : null))
+        .filter((n): n is string => Boolean(n));
+      return names.length > 0 ? names : ['default'];
+    }
+
+    if (typeof data.skins === 'object') {
+      const names = Object.keys(data.skins);
+      return names.length > 0 ? names : ['default'];
+    }
+
+    return ['default'];
+  } catch {
+    return ['default'];
+  }
+}
+
+export function pickDefaultSkin(skins: string[]): string {
+  if (skins.includes('default')) return 'default';
+  return skins[0] ?? 'default';
+}
+
 export function getImagesPathFromJson(jsonText: string): string {
   try {
     const data = JSON.parse(jsonText) as { skeleton?: { images?: string } };
@@ -358,6 +389,7 @@ export async function buildSkeletonJobs(
     try {
       const jsonText = await readTextFile(file);
       const animations = listAnimationsFromJson(jsonText);
+      const skins = listSkinsFromJson(jsonText);
       const name = file.name.replace(/\.json$/i, '');
       const resolved = resolveJobAssets(file.name, jsonText, assets);
 
@@ -368,6 +400,8 @@ export async function buildSkeletonJobs(
         jsonText,
         animations,
         selectedAnimation: animations[0] ?? '',
+        skins,
+        selectedSkin: pickDefaultSkin(skins),
         ...resolved,
       });
     } catch (e) {
@@ -378,6 +412,8 @@ export async function buildSkeletonJobs(
         jsonText: '',
         animations: [],
         selectedAnimation: '',
+        skins: [],
+        selectedSkin: '',
         assetMode: 'images',
         atlasFileName: null,
         imagesPath: './images/',

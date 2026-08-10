@@ -11,8 +11,8 @@ const NAMING_OPTIONS: { value: NamingPattern; label: string }[] = [
   { value: '{name}_{####}', label: 'nazwa_0001' },
   { value: '{name}_{frame}', label: 'nazwa_1' },
   { value: '{####}', label: '0001' },
-  { value: '{name}', label: 'nazwa (tylko pierwsza klatka)' },
-  { value: 'custom', label: 'Własny wzorzec…' },
+  { value: '{name}', label: 'nazwa' },
+  { value: 'custom', label: 'Własny…' },
 ];
 
 export function ExportSettingsPanel({ settings, onChange }: Props) {
@@ -31,13 +31,49 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
   return (
     <section className="panel">
       <header className="panel-header">
-        <h2>4. Ustawienia eksportu</h2>
-        <p>Skala, rozmiar canvasu, nazewnictwo klatek i tryb eksportu.</p>
+        <div className="step-index">4</div>
+        <div>
+          <h2>Ustawienia eksportu</h2>
+          <p>Canvas, skala, zakres animacji i nazewnictwo klatek.</p>
+        </div>
       </header>
 
       <div className="settings-grid">
+        <div className="span-2 toggle-row">
+          <div>
+            <div className="toggle-title">Wszystkie animacje</div>
+            <div className="toggle-desc">
+              Eksport każdej animacji do osobnego folderu wewnątrz folderu JSON
+              <code className="inline-path"> json / animacja / klatki </code>
+            </div>
+          </div>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={settings.exportAllAnimations}
+              onChange={(e) => set('exportAllAnimations', e.target.checked)}
+            />
+            <span className="switch-track" />
+          </label>
+        </div>
+
+        <div className="span-2 toggle-row">
+          <div>
+            <div className="toggle-title">Tylko pierwsza klatka</div>
+            <div className="toggle-desc">Eksportuje wyłącznie klatkę początkową animacji</div>
+          </div>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={settings.firstFrameOnly}
+              onChange={(e) => set('firstFrameOnly', e.target.checked)}
+            />
+            <span className="switch-track" />
+          </label>
+        </div>
+
         <label>
-          Szerokość canvasu (px)
+          Szerokość (px)
           <input
             type="number"
             min={1}
@@ -48,7 +84,7 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
         </label>
 
         <label>
-          Wysokość canvasu (px)
+          Wysokość (px)
           <input
             type="number"
             min={1}
@@ -59,7 +95,7 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
         </label>
 
         <label>
-          Skala klatek
+          Skala
           <input
             type="number"
             min={0.05}
@@ -71,7 +107,7 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
         </label>
 
         <label>
-          FPS eksportu
+          FPS
           <input
             type="number"
             min={1}
@@ -80,15 +116,6 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
             disabled={settings.firstFrameOnly}
             onChange={(e) => set('fps', Number(e.target.value) || 1)}
           />
-        </label>
-
-        <label className="span-2 checkbox">
-          <input
-            type="checkbox"
-            checked={settings.firstFrameOnly}
-            onChange={(e) => set('firstFrameOnly', e.target.checked)}
-          />
-          Eksportuj tylko pierwszą (początkową) klatkę wybranej animacji
         </label>
 
         <label>
@@ -106,7 +133,7 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
         </label>
 
         <label>
-          Liczba cyfr w numerze
+          Cyfry numeru
           <input
             type="number"
             min={1}
@@ -118,7 +145,7 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
 
         {settings.namingPattern === 'custom' && (
           <label className="span-2">
-            Własny wzorzec
+            Wzorzec
             <input
               type="text"
               value={settings.customNaming}
@@ -126,23 +153,29 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
               onChange={(e) => set('customNaming', e.target.value)}
             />
             <span className="field-hint">
-              Placeholdery: {'{name}'}, {'{anim}'}, {'{frame}'}, {'{####}'}, {'{index}'}
+              {'{name}'}, {'{anim}'}, {'{frame}'}, {'{####}'}, {'{index}'}
             </span>
           </label>
         )}
 
         <div className="span-2 preview-name">
-          Przykład nazwy: <code>{preview}.png</code>
+          Przykład: <code>{preview}.png</code>
         </div>
 
-        <label className="span-2 checkbox">
-          <input
-            type="checkbox"
-            checked={settings.transparentBackground}
-            onChange={(e) => set('transparentBackground', e.target.checked)}
-          />
-          Przezroczyste tło
-        </label>
+        <div className="span-2 toggle-row">
+          <div>
+            <div className="toggle-title">Przezroczyste tło</div>
+            <div className="toggle-desc">PNG z kanałem alpha</div>
+          </div>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={settings.transparentBackground}
+              onChange={(e) => set('transparentBackground', e.target.checked)}
+            />
+            <span className="switch-track" />
+          </label>
+        </div>
 
         {!settings.transparentBackground && (
           <label>
@@ -155,14 +188,20 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
           </label>
         )}
 
-        <label className="span-2 checkbox">
-          <input
-            type="checkbox"
-            checked={settings.premultipliedAlpha}
-            onChange={(e) => set('premultipliedAlpha', e.target.checked)}
-          />
-          Premultiplied alpha (PMA) — włącz tylko gdy tekstury/atlas są w formacie PMA
-        </label>
+        <div className="span-2 toggle-row">
+          <div>
+            <div className="toggle-title">Premultiplied alpha</div>
+            <div className="toggle-desc">Włącz tylko dla tekstur/atlasu PMA</div>
+          </div>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={settings.premultipliedAlpha}
+              onChange={(e) => set('premultipliedAlpha', e.target.checked)}
+            />
+            <span className="switch-track" />
+          </label>
+        </div>
       </div>
     </section>
   );

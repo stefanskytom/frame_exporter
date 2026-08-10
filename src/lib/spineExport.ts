@@ -222,6 +222,13 @@ async function loadSkeletonFromJob(
   return skeletonJson.readSkeletonData(assetManager.require(jsonPath));
 }
 
+function animationsToExport(job: SkeletonJob, settings: ExportSettings): string[] {
+  if (settings.exportAllAnimations) {
+    return job.animations;
+  }
+  return job.selectedAnimation ? [job.selectedAnimation] : [];
+}
+
 async function exportSkeletonFrames(
   job: SkeletonJob,
   assets: AssetFiles,
@@ -229,6 +236,11 @@ async function exportSkeletonFrames(
   zip: JSZip,
   onProgress: (partial: Partial<ExportProgress>) => void,
 ): Promise<number> {
+  const animNames = animationsToExport(job, settings);
+  if (animNames.length === 0) {
+    throw new Error(`Brak animacji do eksportu dla ${job.name}`);
+  }
+
   const canvas = document.createElement('canvas');
   canvas.width = settings.canvasWidth;
   canvas.height = settings.canvasHeight;
@@ -251,31 +263,24 @@ async function exportSkeletonFrames(
   try {
     const skeletonData = await loadSkeletonFromJob(job, assets, assetManager);
     const skeleton = new Skeleton(skeletonData);
+
+    const skinName = job.selectedSkin || skeletonData.skins[0]?.name || 'default';
+    try {
+      skeleton.setSkinByName(skinName);
+    } catch {
+      throw new Error(`Skin „${skinName}” nie istnieje w ${job.name}`);
+    }
+    skeleton.setSlotsToSetupPose();
     skeleton.setToSetupPose();
     skeleton.updateWorldTransform(Physics.update);
     const setupBounds = getSkeletonBounds(skeleton);
 
-    if (!job.selectedAnimation) {
-      throw new Error(`Nie wybrano animacji dla ${job.name}`);
-    }
-
-    const animation = skeletonData.findAnimation(job.selectedAnimation);
-    if (!animation) {
-      throw new Error(`Animacja „${job.selectedAnimation}” nie istnieje w ${job.name}`);
-    }
+    const rootFolder = zip.folder(sanitizeFolderName(job.name));
+    if (!rootFolder) throw new Error('Nie udało się utworzyć folderu w archiwum');
 
     const stateData = new AnimationStateData(skeletonData);
     const state = new AnimationState(stateData);
-    state.setAnimation(0, job.selectedAnimation, false);
-
-    const folder = zip.folder(sanitizeFolderName(job.name));
-    if (!folder) throw new Error('Nie udało się utworzyć folderu w archiwum');
-
     const template = resolveNamingTemplate(settings);
-    const duration = animation.duration;
-    const frameCount = settings.firstFrameOnly
-      ? 1
-      : Math.max(1, Math.ceil(duration * settings.fps) || 1);
 
     const bg = settings.transparentBackground
       ? { r: 0, g: 0, b: 0, a: 0 }
@@ -290,47 +295,71 @@ async function exportSkeletonFrames(
 
     let exported = 0;
 
-    for (let i = 0; i < frameCount; i++) {
-      const time = settings.firstFrameOnly ? 0 : i / settings.fps;
+    for (let animIndex = 0; animIndex < animNames.length; animIndex++) {
+      const animName = animNames[animIndex];
+      const animation = skeletonData.findAnimation(animName);
+      if (!animation) {
+        throw new Error(`Animacja „${animName}” nie istnieje w ${job.name}`);
+      }
 
-      skeleton.setToSetupPose();
-      state.clearTracks();
-      const entry = state.setAnimation(0, job.selectedAnimation, false);
-      entry.trackTime = Math.min(time, Math.max(duration - 0.0001, 0));
-      entry.animationStart = 0;
-      entry.animationEnd = duration;
+      const targetFolder = settings.exportAllAnimations
+        ? rootFolder.folder(sanitizeFolderName(animName))
+        : rootFolder;
+      if (!targetFolder) {
+        throw new Error(`Nie udało się utworzyć folderu animacji „${animName}”`);
+      }
 
-      state.apply(skeleton);
-      skeleton.updateWorldTransform(Physics.update);
+      const duration = animation.duration;
+      const frameCount = settings.firstFrameOnly
+        ? 1
+        : Math.max(1, Math.ceil(duration * settings.fps) || 1);
 
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.clearColor(bg.r, bg.g, bg.b, bg.a);
-      gl.clear(gl.COLOR_BUFFER_BIT);
+      for (let i = 0; i < frameCount; i++) {
+        const time = settings.firstFrameOnly ? 0 : i / settings.fps;
 
-      renderer.begin();
-      renderer.drawSkeleton(skeleton, settings.premultipliedAlpha);
-      renderer.end();
+        skeleton.setSkinByName(skinName);
+        skeleton.setSlotsToSetupPose();
+        skeleton.setToSetupPose();
+        state.clearTracks();
+        const entry = state.setAnimation(0, animName, false);
+        entry.trackTime = Math.min(time, Math.max(duration - 0.0001, 0));
+        entry.animationStart = 0;
+        entry.animationEnd = duration;
 
-      const blob = await canvasToBlob(canvas);
-      const frameNumber = i + 1;
-      const baseName = formatFrameName(template, {
-        name: job.name,
-        anim: job.selectedAnimation,
-        frame: frameNumber,
-        index: i,
-        paddingDigits: settings.paddingDigits,
-      });
-      folder.file(`${baseName}.png`, blob);
-      exported += 1;
+        state.apply(skeleton);
+        skeleton.updateWorldTransform(Physics.update);
 
-      onProgress({
-        currentSkeleton: job.name,
-        currentFrame: frameNumber,
-        totalFrames: frameCount,
-        message: `${job.name}: klatka ${frameNumber}/${frameCount}`,
-      });
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clearColor(bg.r, bg.g, bg.b, bg.a);
+        gl.clear(gl.COLOR_BUFFER_BIT);
 
-      await new Promise((r) => setTimeout(r, 0));
+        renderer.begin();
+        renderer.drawSkeleton(skeleton, settings.premultipliedAlpha);
+        renderer.end();
+
+        const blob = await canvasToBlob(canvas);
+        const frameNumber = i + 1;
+        const baseName = formatFrameName(template, {
+          name: job.name,
+          anim: animName,
+          frame: frameNumber,
+          index: i,
+          paddingDigits: settings.paddingDigits,
+        });
+        targetFolder.file(`${baseName}.png`, blob);
+        exported += 1;
+
+        onProgress({
+          currentSkeleton: job.name,
+          currentFrame: frameNumber,
+          totalFrames: frameCount,
+          message: settings.exportAllAnimations
+            ? `${job.name}/${animName}: klatka ${frameNumber}/${frameCount} (${animIndex + 1}/${animNames.length})`
+            : `${job.name}: klatka ${frameNumber}/${frameCount}`,
+        });
+
+        await new Promise((r) => setTimeout(r, 0));
+      }
     }
 
     return exported;
@@ -342,13 +371,162 @@ async function exportSkeletonFrames(
   }
 }
 
+export interface FrameSizeInfo {
+  /** Unscaled content AABB in Spine units (≈px at scale 1). */
+  width: number;
+  height: number;
+  /** After applying export scale. */
+  scaledWidth: number;
+  scaledHeight: number;
+  /** Suggested canvas (ceil scaled size). */
+  suggestedCanvasWidth: number;
+  suggestedCanvasHeight: number;
+  fitsCanvas: boolean;
+  source: string;
+}
+
+function ceilPx(n: number): number {
+  return Math.max(1, Math.ceil(n));
+}
+
+function applyPoseAtTime(
+  skeleton: Skeleton,
+  state: AnimationState,
+  animName: string,
+  duration: number,
+  time: number,
+  skinName: string,
+) {
+  skeleton.setSkinByName(skinName);
+  skeleton.setSlotsToSetupPose();
+  skeleton.setToSetupPose();
+  state.clearTracks();
+  const entry = state.setAnimation(0, animName, false);
+  entry.trackTime = Math.min(Math.max(time, 0), Math.max(duration - 0.0001, 0));
+  entry.animationStart = 0;
+  entry.animationEnd = duration;
+  state.apply(skeleton);
+  skeleton.updateWorldTransform(Physics.update);
+}
+
+/**
+ * Measures max content AABB for the selected skin/animation(s), then applies scale.
+ * Samples several times along each animation so canvas advice covers motion.
+ */
+export async function measureJobFrameSize(
+  job: SkeletonJob,
+  assets: AssetFiles,
+  settings: Pick<
+    ExportSettings,
+    'scale' | 'exportAllAnimations' | 'canvasWidth' | 'canvasHeight'
+  >,
+): Promise<FrameSizeInfo> {
+  if (job.status !== 'ready') {
+    throw new Error('Job nie jest gotowy');
+  }
+
+  const animNames = animationsToExport(
+    job,
+    settings as ExportSettings,
+  );
+  if (animNames.length === 0) {
+    throw new Error('Brak animacji');
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 4;
+  canvas.height = 4;
+
+  const context = new ManagedWebGLRenderingContext(canvas, {
+    alpha: true,
+    premultipliedAlpha: false,
+    antialias: false,
+    preserveDrawingBuffer: false,
+  });
+  const gl = context.gl;
+  if (!gl) throw new Error('WebGL niedostępny');
+
+  const assetManager = new AssetManager(context);
+
+  try {
+    const skeletonData = await loadSkeletonFromJob(job, assets, assetManager);
+    const skeleton = new Skeleton(skeletonData);
+    const skinName = job.selectedSkin || skeletonData.skins[0]?.name || 'default';
+    skeleton.setSkinByName(skinName);
+    skeleton.setSlotsToSetupPose();
+
+    const state = new AnimationState(new AnimationStateData(skeletonData));
+
+    let maxW = 0;
+    let maxH = 0;
+
+    for (const animName of animNames) {
+      const animation = skeletonData.findAnimation(animName);
+      if (!animation) continue;
+      const duration = Math.max(animation.duration, 0);
+      const steps = duration <= 0 ? 1 : Math.min(24, Math.max(4, Math.ceil(duration * 12)));
+
+      for (let s = 0; s < steps; s++) {
+        const t = duration <= 0 ? 0 : (s / Math.max(steps - 1, 1)) * duration;
+        applyPoseAtTime(skeleton, state, animName, duration, t, skinName);
+        const bounds = getSkeletonBounds(skeleton);
+        if (bounds.size.x > maxW) maxW = bounds.size.x;
+        if (bounds.size.y > maxH) maxH = bounds.size.y;
+      }
+    }
+
+    if (maxW < 1 || maxH < 1) {
+      skeleton.setSkinByName(skinName);
+      skeleton.setSlotsToSetupPose();
+      skeleton.setToSetupPose();
+      skeleton.updateWorldTransform(Physics.update);
+      const bounds = getSkeletonBounds(skeleton);
+      maxW = Math.max(maxW, bounds.size.x);
+      maxH = Math.max(maxH, bounds.size.y);
+    }
+
+    const scale = settings.scale > 0 ? settings.scale : 1;
+    const scaledWidth = maxW * scale;
+    const scaledHeight = maxH * scale;
+    const suggestedCanvasWidth = ceilPx(scaledWidth);
+    const suggestedCanvasHeight = ceilPx(scaledHeight);
+
+    const source = settings.exportAllAnimations
+      ? `${animNames.length} anim. · skin „${skinName}” · max AABB`
+      : `„${animNames[0]}” · skin „${skinName}” · max AABB`;
+
+    return {
+      width: maxW,
+      height: maxH,
+      scaledWidth,
+      scaledHeight,
+      suggestedCanvasWidth,
+      suggestedCanvasHeight,
+      fitsCanvas:
+        suggestedCanvasWidth <= settings.canvasWidth &&
+        suggestedCanvasHeight <= settings.canvasHeight,
+      source,
+    };
+  } finally {
+    assetManager.dispose();
+    const lose = gl.getExtension('WEBGL_lose_context');
+    lose?.loseContext();
+  }
+}
+
+export function isJobExportable(job: SkeletonJob, settings: ExportSettings): boolean {
+  if (job.status !== 'ready') return false;
+  if (settings.exportAllAnimations) return job.animations.length > 0;
+  return Boolean(job.selectedAnimation);
+}
+
 export async function exportAllJobs(
   jobs: SkeletonJob[],
   assets: AssetFiles,
   settings: ExportSettings,
   onProgress: (progress: ExportProgress) => void,
 ): Promise<void> {
-  const ready = jobs.filter((j) => j.status === 'ready' && j.selectedAnimation);
+  const ready = jobs.filter((j) => isJobExportable(j, settings));
   if (ready.length === 0) {
     throw new Error('Brak gotowych plików do eksportu');
   }

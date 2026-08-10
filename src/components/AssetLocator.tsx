@@ -33,11 +33,14 @@ export function AssetLocator({
   return (
     <section className="panel">
       <header className="panel-header">
-        <h2>2. Lokalizacja assetów</h2>
-        <p>
-          Wskaż folder z obrazami PNG używanymi przez animację (np. <code>images/</code>).
-          Plik <code>.atlas</code> jest opcjonalny — tylko jeśli eksport był spakowany.
-        </p>
+        <div className="step-index">2</div>
+        <div>
+          <h2>Lokalizacja assetów</h2>
+          <p>
+            Folder PNG (np. <code>images/</code>). Atlas <code>.atlas</code> tylko przy
+            spakowanym eksporcie.
+          </p>
+        </div>
       </header>
 
       <div className="asset-actions">
@@ -59,7 +62,7 @@ export function AssetLocator({
         </label>
 
         <label htmlFor={filesId} className={`btn ghost ${disabled ? 'disabled' : ''}`}>
-          Lub wybierz pliki .png / .atlas
+          Pliki .png / .atlas
           <input
             id={filesId}
             ref={filesRef}
@@ -75,14 +78,21 @@ export function AssetLocator({
         </label>
       </div>
 
-      <div className="asset-stats" aria-live="polite">
+      <div className={`asset-stats ${assetCount > 0 ? 'filled' : ''}`} aria-live="polite">
         {assetCount === 0 ? (
-          <span className="muted">Nie wczytano jeszcze assetów graficznych.</span>
+          <span className="muted">Brak wczytanych assetów</span>
         ) : (
-          <span>
-            Wczytano <strong>{assetCount}</strong> plików — obrazów:{' '}
-            <strong>{imageCount}</strong>, atlasów: <strong>{atlasCount}</strong>
-          </span>
+          <div className="stat-pills">
+            <span className="stat-pill">
+              <strong>{assetCount}</strong> plików
+            </span>
+            <span className="stat-pill">
+              <strong>{imageCount}</strong> obrazów
+            </span>
+            <span className="stat-pill">
+              <strong>{atlasCount}</strong> atlasów
+            </span>
+          </div>
         )}
       </div>
     </section>

@@ -11,6 +11,7 @@ Aplikacja webowa do eksportowania klatek animacji z plików Spine (`.json`).
 - Wybór animacji źródłowej
 - Eksport tylko pierwszej (początkowej) klatki
 - Lokalizacja assetów: folder obrazów PNG **albo** `.atlas` + tekstury
+- Eksport wszystkich animacji (osobny podfolder na każdą)
 
 ## Wymagania
 

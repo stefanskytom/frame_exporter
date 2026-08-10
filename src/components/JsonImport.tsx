@@ -25,8 +25,11 @@ export function JsonImport({ onJsonFiles, disabled }: Props) {
   return (
     <section className="panel">
       <header className="panel-header">
-        <h2>1. Pliki Spine JSON</h2>
-        <p>Zaimportuj jeden lub wiele plików .json jednocześnie — z listy plików albo z całego folderu.</p>
+        <div className="step-index">1</div>
+        <div>
+          <h2>Pliki Spine JSON</h2>
+          <p>Jeden lub wiele plików — z listy albo całego folderu.</p>
+        </div>
       </header>
 
       <div
@@ -41,12 +44,29 @@ export function JsonImport({ onJsonFiles, disabled }: Props) {
           handleFiles(e.dataTransfer.files);
         }}
       >
-        <span className="dropzone-title">Upuść pliki .json tutaj</span>
-        <span className="dropzone-hint">albo wybierz poniżej — w oknie dialogu widać całą zawartość folderu</span>
+        <div className="dropzone-icon" aria-hidden>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 16V4m0 0 4 4m-4-4-4 4"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+          </svg>
+        </div>
+        <span className="dropzone-title">Upuść pliki .json</span>
+        <span className="dropzone-hint">lub wybierz z dysku</span>
 
         <div className="dropzone-actions">
           <label htmlFor={filesId} className={`btn secondary ${disabled ? 'disabled' : ''}`}>
-            Wybierz pliki .json
+            Wybierz pliki
             <input
               id={filesId}
               ref={filesRef}

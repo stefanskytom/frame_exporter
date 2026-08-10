@@ -1,28 +1,37 @@
-@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg: #e8eef2;
-  --bg-accent: #d5e2ea;
-  --surface: #f7fafc;
-  --surface-2: #ffffff;
-  --ink: #15202b;
-  --muted: #5b6b7a;
-  --line: #c5d2dc;
-  --accent: #0f766e;
-  --accent-strong: #0b5f59;
-  --accent-soft: #d1f0ec;
-  --danger: #b42318;
-  --ok: #067647;
-  --shadow: 0 12px 40px rgba(21, 32, 43, 0.08);
-  --radius: 14px;
-  font-family: 'Figtree', sans-serif;
+  --bg-0: #0b0b0d;
+  --bg-1: #141416;
+  --bg-2: #1c1c1e;
+  --bg-3: #2a2a2d;
+  --bg-4: #3a3a3e;
+  --surface: rgba(44, 44, 46, 0.72);
+  --surface-solid: #2c2c2e;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --ink: #f5f5f7;
+  --muted: #98989d;
+  --blue: #0a84ff;
+  --blue-press: #0071e3;
+  --blue-soft: rgba(10, 132, 255, 0.18);
+  --green: #30d158;
+  --green-soft: rgba(48, 209, 88, 0.16);
+  --red: #ff453a;
+  --red-soft: rgba(255, 69, 58, 0.16);
+  --orange: #ff9f0a;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --font: 'Manrope', 'SF Pro Display', 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', 'SF Mono', ui-monospace, monospace;
+
+  color-scheme: dark;
+  font-family: var(--font);
   line-height: 1.45;
   font-weight: 400;
   color: var(--ink);
-  background:
-    radial-gradient(1200px 500px at 10% -10%, #cfe8e4 0%, transparent 55%),
-    radial-gradient(900px 420px at 100% 0%, #c9d8e8 0%, transparent 50%),
-    linear-gradient(180deg, var(--bg) 0%, var(--bg-accent) 100%);
+  background: var(--bg-0);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -41,6 +50,10 @@ body,
 
 body {
   min-width: 320px;
+  background:
+    radial-gradient(900px 480px at 15% -10%, rgba(10, 132, 255, 0.12), transparent 55%),
+    radial-gradient(700px 380px at 95% 5%, rgba(48, 209, 88, 0.05), transparent 45%),
+    linear-gradient(180deg, #121214 0%, var(--bg-0) 42%, #09090b 100%);
 }
 
 button,
@@ -50,7 +63,11 @@ select {
   color: inherit;
 }
 
-code {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 0.92em;
+code,
+pre {
+  font-family: var(--mono);
+}
+
+::selection {
+  background: rgba(10, 132, 255, 0.35);
 }

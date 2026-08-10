@@ -13,6 +13,8 @@ export interface ExportSettings {
   scale: number;
   fps: number;
   firstFrameOnly: boolean;
+  /** Export every animation in the JSON into its own subfolder. */
+  exportAllAnimations: boolean;
   namingPattern: NamingPattern;
   customNaming: string;
   paddingDigits: number;
@@ -28,6 +30,8 @@ export interface SkeletonJob {
   jsonText: string;
   animations: string[];
   selectedAnimation: string;
+  skins: string[];
+  selectedSkin: string;
   assetMode: AssetMode;
   atlasFileName: string | null;
   imagesPath: string;
@@ -59,6 +63,7 @@ export const DEFAULT_SETTINGS: ExportSettings = {
   scale: 1,
   fps: 30,
   firstFrameOnly: false,
+  exportAllAnimations: false,
   namingPattern: '{name}_{####}',
   customNaming: '{name}_{####}',
   paddingDigits: 4,
