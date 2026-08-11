@@ -8,11 +8,11 @@ interface Props {
 }
 
 const NAMING_OPTIONS: { value: NamingPattern; label: string }[] = [
-  { value: '{name}_{####}', label: 'nazwa_0001' },
-  { value: '{name}_{frame}', label: 'nazwa_1' },
+  { value: '{name}_{####}', label: 'name_0001' },
+  { value: '{name}_{frame}', label: 'name_1' },
   { value: '{####}', label: '0001' },
-  { value: '{name}', label: 'nazwa' },
-  { value: 'custom', label: 'Własny…' },
+  { value: '{name}', label: 'name' },
+  { value: 'custom', label: 'Custom…' },
 ];
 
 export function ExportSettingsPanel({ settings, onChange }: Props) {
@@ -33,18 +33,18 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
       <header className="panel-header">
         <div className="step-index">4</div>
         <div>
-          <h2>Ustawienia eksportu</h2>
-          <p>Canvas, skala, zakres animacji i nazewnictwo klatek.</p>
+          <h2>Export settings</h2>
+          <p>Canvas, scale, animation scope, and frame naming.</p>
         </div>
       </header>
 
       <div className="settings-grid">
         <div className="span-2 toggle-row">
           <div>
-            <div className="toggle-title">Wszystkie animacje</div>
+            <div className="toggle-title">All animations</div>
             <div className="toggle-desc">
-              Eksport każdej animacji do osobnego folderu wewnątrz folderu JSON
-              <code className="inline-path"> json / animacja / klatki </code>
+              Export every animation into its own folder inside the JSON folder
+              <code className="inline-path"> json / animation / frames </code>
             </div>
           </div>
           <label className="switch">
@@ -59,8 +59,8 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
 
         <div className="span-2 toggle-row">
           <div>
-            <div className="toggle-title">Tylko pierwsza klatka</div>
-            <div className="toggle-desc">Eksportuje wyłącznie klatkę początkową animacji</div>
+            <div className="toggle-title">First frame only</div>
+            <div className="toggle-desc">Export only the starting frame of the animation</div>
           </div>
           <label className="switch">
             <input
@@ -73,7 +73,7 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
         </div>
 
         <label>
-          Szerokość (px)
+          Width (px)
           <input
             type="number"
             min={1}
@@ -84,7 +84,7 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
         </label>
 
         <label>
-          Wysokość (px)
+          Height (px)
           <input
             type="number"
             min={1}
@@ -95,7 +95,7 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
         </label>
 
         <label>
-          Skala
+          Scale
           <input
             type="number"
             min={0.05}
@@ -119,7 +119,7 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
         </label>
 
         <label>
-          Nazwy klatek
+          Frame names
           <select
             value={settings.namingPattern}
             onChange={(e) => set('namingPattern', e.target.value as NamingPattern)}
@@ -133,7 +133,7 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
         </label>
 
         <label>
-          Cyfry numeru
+          Number digits
           <input
             type="number"
             min={1}
@@ -145,7 +145,7 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
 
         {settings.namingPattern === 'custom' && (
           <label className="span-2">
-            Wzorzec
+            Pattern
             <input
               type="text"
               value={settings.customNaming}
@@ -159,13 +159,13 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
         )}
 
         <div className="span-2 preview-name">
-          Przykład: <code>{preview}.png</code>
+          Example: <code>{preview}.png</code>
         </div>
 
         <div className="span-2 toggle-row">
           <div>
-            <div className="toggle-title">Przezroczyste tło</div>
-            <div className="toggle-desc">PNG z kanałem alpha</div>
+            <div className="toggle-title">Transparent background</div>
+            <div className="toggle-desc">PNG with alpha channel</div>
           </div>
           <label className="switch">
             <input
@@ -179,7 +179,7 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
 
         {!settings.transparentBackground && (
           <label>
-            Kolor tła
+            Background color
             <input
               type="color"
               value={settings.backgroundColor}
@@ -191,7 +191,7 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
         <div className="span-2 toggle-row">
           <div>
             <div className="toggle-title">Premultiplied alpha</div>
-            <div className="toggle-desc">Włącz tylko dla tekstur/atlasu PMA</div>
+            <div className="toggle-desc">Enable only for PMA textures / atlases</div>
           </div>
           <label className="switch">
             <input

@@ -100,18 +100,18 @@ export default function App() {
       totalFrames: 0,
       skeletonIndex: 0,
       skeletonTotal: readyCount,
-      message: 'Start eksportu…',
+      message: 'Starting export…',
     });
 
     try {
       await exportAllJobs(jobs, assets, settings, setProgress);
       setDoneMessage(
         settings.exportAllAnimations
-          ? `Wyeksportowano ${readyCount} JSON · ${totalAnims} animacji (podfoldery per animacja).`
-          : `Wyeksportowano ${readyCount} ${readyCount === 1 ? 'szkielet' : 'szkielety'} do ZIP.`,
+          ? `Exported ${readyCount} JSON · ${totalAnims} animations (subfolders per animation).`
+          : `Exported ${readyCount} ${readyCount === 1 ? 'skeleton' : 'skeletons'} to ZIP.`,
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Nieznany błąd eksportu');
+      setError(e instanceof Error ? e.message : 'Unknown export error');
     } finally {
       setBusy(false);
       setProgress(null);
@@ -138,10 +138,10 @@ export default function App() {
 
       <main className="app">
         <section className="intro">
-          <h1>Eksport klatek animacji</h1>
+          <h1>Animation frame export</h1>
           <p>
-            Importuj JSON-y Spine, wskaż assety i generuj sekwencje PNG. Każdy szkielet ma
-            własny folder — opcjonalnie z podfolderami na każdą animację.
+            Import Spine JSON files, point to assets, and generate PNG sequences. Each
+            skeleton gets its own folder — optionally with subfolders per animation.
           </p>
         </section>
 
@@ -189,13 +189,13 @@ export default function App() {
             <div className="export-meta">
               <div className="step-index">5</div>
               <div>
-                <h2>Eksport</h2>
+                <h2>Export</h2>
                 <p>
-                  Gotowe: <strong>{readyCount}</strong> / {jobs.length}
+                  Ready: <strong>{readyCount}</strong> / {jobs.length}
                   {settings.exportAllAnimations && readyCount > 0 ? (
                     <>
                       {' '}
-                      · <strong>{totalAnims}</strong> animacji
+                      · <strong>{totalAnims}</strong> animations
                     </>
                   ) : null}
                 </p>
@@ -214,12 +214,12 @@ export default function App() {
               disabled={busy || readyCount === 0}
               onClick={handleExport}
             >
-              {busy ? 'Eksportuję…' : 'Eksportuj ZIP'}
+              {busy ? 'Exporting…' : 'Export ZIP'}
             </button>
           </section>
 
           <aside className="panel tip">
-            <h3>Struktura ZIP</h3>
+            <h3>ZIP structure</h3>
             <pre className="tree">
 {`export.zip
 └── hero/
@@ -229,8 +229,8 @@ export default function App() {
         └── hero_0001.png`}
             </pre>
             <p className="tip-note">
-              Przy jednej animacji klatki leżą bezpośrednio w folderze JSON. Spine 4.x —
-              obrazy lub atlas.
+              With a single animation, frames sit directly in the JSON folder. Spine 4.x —
+              images or atlas.
             </p>
           </aside>
         </div>

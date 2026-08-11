@@ -38,7 +38,7 @@ export function useFrameSizes(
           next[job.id] = await measureJobFrameSize(job, assets, settings);
         } catch (e) {
           next[job.id] = {
-            error: e instanceof Error ? e.message : 'Nie udało się zmierzyć klatki',
+            error: e instanceof Error ? e.message : 'Failed to measure frame',
           };
         }
         if (genRef.current === gen) {

@@ -1,46 +1,48 @@
 # Spine Frame Exporter
 
-Aplikacja webowa do eksportowania klatek animacji z plików Spine (`.json`).
+Web app for exporting animation frames from Spine (`.json`) files.
 
-## Funkcje
+## Features
 
-- Import wielu plików `.json` jednocześnie
-- Osobny folder w ZIP dla każdego JSON
-- Wybór nazwy klatek (wzorzec lub własny)
-- Skala klatek i rozmiar canvasu
-- Wybór animacji źródłowej
-- Eksport tylko pierwszej (początkowej) klatki
-- Lokalizacja assetów: folder obrazów PNG **albo** `.atlas` + tekstury
-- Eksport wszystkich animacji (osobny podfolder na każdą)
+- Import multiple `.json` files at once
+- Separate ZIP folder per JSON
+- Frame naming (presets or custom)
+- Frame scale and canvas size
+- Source animation selection
+- First-frame-only export
+- Asset location: PNG image folder **or** `.atlas` + textures
+- Export all animations (subfolder per animation)
+- Skin selection
+- Frame size preview (scaled content bounds)
 
-## Wymagania
+## Requirements
 
-- Eksport Spine **4.x**
-- Typowe setupy:
-  - JSON + folder `images/` (bez atlasu)
-  - JSON + `.atlas` + PNG (spakowany atlas)
-- Przeglądarka z WebGL
+- Spine **4.x** export
+- Typical setups:
+  - JSON + `images/` folder (no atlas)
+  - JSON + `.atlas` + PNG (packed atlas)
+- Browser with WebGL
 
-## Uruchomienie
+## Run
 
 ```bash
 npm install
 npm run dev
 ```
 
-Build produkcyjny:
+Production build:
 
 ```bash
 npm run build
 npm run preview
 ```
 
-## Użycie
+## Usage
 
-1. Zaimportuj jeden lub wiele plików `.json`
-2. Wskaż folder z obrazami PNG (lub atlasem)
-3. Dla każdego JSON wybierz animację
-4. Ustaw canvas, skalę, FPS / pierwszą klatkę oraz nazewnictwo
-5. Kliknij **Eksportuj klatki (ZIP)**
+1. Import one or more `.json` files
+2. Point to the PNG images folder (or atlas)
+3. Pick animation and skin for each JSON
+4. Set canvas, scale, FPS / first frame, and naming
+5. Click **Export ZIP**
 
-Placeholdery nazw: `{name}`, `{anim}`, `{frame}`, `{####}`, `{index}`.
+Name placeholders: `{name}`, `{anim}`, `{frame}`, `{####}`, `{index}`.

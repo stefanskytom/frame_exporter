@@ -27,8 +27,8 @@ export function JsonImport({ onJsonFiles, disabled }: Props) {
       <header className="panel-header">
         <div className="step-index">1</div>
         <div>
-          <h2>Pliki Spine JSON</h2>
-          <p>Jeden lub wiele plików — z listy albo całego folderu.</p>
+          <h2>Spine JSON files</h2>
+          <p>One or many files — from a file list or an entire folder.</p>
         </div>
       </header>
 
@@ -61,12 +61,12 @@ export function JsonImport({ onJsonFiles, disabled }: Props) {
             />
           </svg>
         </div>
-        <span className="dropzone-title">Upuść pliki .json</span>
-        <span className="dropzone-hint">lub wybierz z dysku</span>
+        <span className="dropzone-title">Drop .json files here</span>
+        <span className="dropzone-hint">or pick from disk</span>
 
         <div className="dropzone-actions">
           <label htmlFor={filesId} className={`btn secondary ${disabled ? 'disabled' : ''}`}>
-            Wybierz pliki
+            Choose files
             <input
               id={filesId}
               ref={filesRef}
@@ -82,7 +82,7 @@ export function JsonImport({ onJsonFiles, disabled }: Props) {
           </label>
 
           <label htmlFor={folderId} className={`btn ghost ${disabled ? 'disabled' : ''}`}>
-            Wybierz folder
+            Choose folder
             <input
               id={folderId}
               ref={folderRef}

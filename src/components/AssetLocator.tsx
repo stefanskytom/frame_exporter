@@ -35,17 +35,17 @@ export function AssetLocator({
       <header className="panel-header">
         <div className="step-index">2</div>
         <div>
-          <h2>Lokalizacja assetów</h2>
+          <h2>Asset location</h2>
           <p>
-            Folder PNG (np. <code>images/</code>). Atlas <code>.atlas</code> tylko przy
-            spakowanym eksporcie.
+            PNG folder (e.g. <code>images/</code>). <code>.atlas</code> only needed for packed
+            exports.
           </p>
         </div>
       </header>
 
       <div className="asset-actions">
         <label htmlFor={folderId} className={`btn secondary ${disabled ? 'disabled' : ''}`}>
-          Wybierz folder assetów
+          Choose assets folder
           <input
             id={folderId}
             ref={folderRef}
@@ -62,7 +62,7 @@ export function AssetLocator({
         </label>
 
         <label htmlFor={filesId} className={`btn ghost ${disabled ? 'disabled' : ''}`}>
-          Pliki .png / .atlas
+          .png / .atlas files
           <input
             id={filesId}
             ref={filesRef}
@@ -80,17 +80,17 @@ export function AssetLocator({
 
       <div className={`asset-stats ${assetCount > 0 ? 'filled' : ''}`} aria-live="polite">
         {assetCount === 0 ? (
-          <span className="muted">Brak wczytanych assetów</span>
+          <span className="muted">No assets loaded yet</span>
         ) : (
           <div className="stat-pills">
             <span className="stat-pill">
-              <strong>{assetCount}</strong> plików
+              <strong>{assetCount}</strong> files
             </span>
             <span className="stat-pill">
-              <strong>{imageCount}</strong> obrazów
+              <strong>{imageCount}</strong> images
             </span>
             <span className="stat-pill">
-              <strong>{atlasCount}</strong> atlasów
+              <strong>{atlasCount}</strong> atlases
             </span>
           </div>
         )}

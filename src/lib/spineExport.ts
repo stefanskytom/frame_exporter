@@ -74,7 +74,7 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
     canvas.toBlob(
       (blob) => {
         if (blob) resolve(blob);
-        else reject(new Error('Nie udało się zapisać klatki PNG'));
+        else reject(new Error('Failed to save PNG frame'));
       },
       'image/png',
     );
@@ -118,12 +118,12 @@ async function prepareAtlasMode(
   assetManager: AssetManager,
 ): Promise<{ atlasPath: string; jsonPath: string }> {
   if (!job.atlasFileName) {
-    throw new Error(`Brak atlasu dla ${job.name}`);
+    throw new Error(`Missing atlas for ${job.name}`);
   }
 
   const atlasFile = findAssetFile(assets, job.atlasFileName);
   if (!atlasFile) {
-    throw new Error(`Nie znaleziono pliku atlasu: ${job.atlasFileName}`);
+    throw new Error(`Atlas file not found: ${job.atlasFileName}`);
   }
 
   const atlasText = await readTextFile(atlasFile);
@@ -138,7 +138,7 @@ async function prepareAtlasMode(
     const imageFile = findAssetFile(assets, imageName);
     if (!imageFile) {
       throw new Error(
-        `Brak tekstury „${imageName}” wymaganej przez ${atlasFile.name}. Dodaj ją w lokalizacji assetów.`,
+        `Missing texture “${imageName}” required by ${atlasFile.name}. Add it in the assets location.`,
       );
     }
     assetManager.setRawDataURI(imageName, await fileToDataUri(imageFile));
@@ -167,7 +167,7 @@ async function prepareImagesMode(
   for (const attachmentPath of job.requiredImagePaths) {
     const imageFile = resolveImageFile(assets, attachmentPath, job.imagesPath);
     if (!imageFile) {
-      throw new Error(`Brak obrazu dla attachmentu „${attachmentPath}”`);
+      throw new Error(`Missing image for attachment „${attachmentPath}”`);
     }
 
     const { width, height } = await readImageSize(imageFile);
@@ -238,7 +238,7 @@ async function exportSkeletonFrames(
 ): Promise<number> {
   const animNames = animationsToExport(job, settings);
   if (animNames.length === 0) {
-    throw new Error(`Brak animacji do eksportu dla ${job.name}`);
+    throw new Error(`No animations to export for ${job.name}`);
   }
 
   const canvas = document.createElement('canvas');
@@ -254,7 +254,7 @@ async function exportSkeletonFrames(
 
   const gl = context.gl;
   if (!gl) {
-    throw new Error('WebGL jest niedostępny w tej przeglądarce');
+    throw new Error('WebGL is unavailable in this browser');
   }
 
   const assetManager = new AssetManager(context);
@@ -268,7 +268,7 @@ async function exportSkeletonFrames(
     try {
       skeleton.setSkinByName(skinName);
     } catch {
-      throw new Error(`Skin „${skinName}” nie istnieje w ${job.name}`);
+      throw new Error(`Skin “${skinName}” does not exist in ${job.name}`);
     }
     skeleton.setSlotsToSetupPose();
     skeleton.setToSetupPose();
@@ -276,7 +276,7 @@ async function exportSkeletonFrames(
     const setupBounds = getSkeletonBounds(skeleton);
 
     const rootFolder = zip.folder(sanitizeFolderName(job.name));
-    if (!rootFolder) throw new Error('Nie udało się utworzyć folderu w archiwum');
+    if (!rootFolder) throw new Error('Failed to create folder in archive');
 
     const stateData = new AnimationStateData(skeletonData);
     const state = new AnimationState(stateData);
@@ -299,14 +299,14 @@ async function exportSkeletonFrames(
       const animName = animNames[animIndex];
       const animation = skeletonData.findAnimation(animName);
       if (!animation) {
-        throw new Error(`Animacja „${animName}” nie istnieje w ${job.name}`);
+        throw new Error(`Animation “${animName}” does not exist in ${job.name}`);
       }
 
       const targetFolder = settings.exportAllAnimations
         ? rootFolder.folder(sanitizeFolderName(animName))
         : rootFolder;
       if (!targetFolder) {
-        throw new Error(`Nie udało się utworzyć folderu animacji „${animName}”`);
+        throw new Error(`Failed to create animation folder „${animName}”`);
       }
 
       const duration = animation.duration;
@@ -354,8 +354,8 @@ async function exportSkeletonFrames(
           currentFrame: frameNumber,
           totalFrames: frameCount,
           message: settings.exportAllAnimations
-            ? `${job.name}/${animName}: klatka ${frameNumber}/${frameCount} (${animIndex + 1}/${animNames.length})`
-            : `${job.name}: klatka ${frameNumber}/${frameCount}`,
+            ? `${job.name}/${animName}: frame ${frameNumber}/${frameCount} (${animIndex + 1}/${animNames.length})`
+            : `${job.name}: frame ${frameNumber}/${frameCount}`,
         });
 
         await new Promise((r) => setTimeout(r, 0));
@@ -430,7 +430,7 @@ export async function measureJobFrameSize(
     settings as ExportSettings,
   );
   if (animNames.length === 0) {
-    throw new Error('Brak animacji');
+    throw new Error('No animations');
   }
 
   const canvas = document.createElement('canvas');
@@ -444,7 +444,7 @@ export async function measureJobFrameSize(
     preserveDrawingBuffer: false,
   });
   const gl = context.gl;
-  if (!gl) throw new Error('WebGL niedostępny');
+  if (!gl) throw new Error('WebGL unavailable');
 
   const assetManager = new AssetManager(context);
 
@@ -492,8 +492,8 @@ export async function measureJobFrameSize(
     const suggestedCanvasHeight = ceilPx(scaledHeight);
 
     const source = settings.exportAllAnimations
-      ? `${animNames.length} anim. · skin „${skinName}” · max AABB`
-      : `„${animNames[0]}” · skin „${skinName}” · max AABB`;
+      ? `${animNames.length} anim. · skin “${skinName}” · max AABB`
+      : `“${animNames[0]}” · skin “${skinName}” · max AABB`;
 
     return {
       width: maxW,
@@ -528,7 +528,7 @@ export async function exportAllJobs(
 ): Promise<void> {
   const ready = jobs.filter((j) => isJobExportable(j, settings));
   if (ready.length === 0) {
-    throw new Error('Brak gotowych plików do eksportu');
+    throw new Error('No ready files to export');
   }
 
   const zip = new JSZip();
@@ -542,7 +542,7 @@ export async function exportAllJobs(
       totalFrames: 0,
       skeletonIndex,
       skeletonTotal: ready.length,
-      message: `Przygotowywanie ${job.name} (${job.assetMode === 'atlas' ? 'atlas' : 'obrazy'})…`,
+      message: `Preparing ${job.name} (${job.assetMode === 'atlas' ? 'atlas' : 'images'})…`,
     });
 
     await exportSkeletonFrames(job, assets, settings, zip, (partial) => {
@@ -563,7 +563,7 @@ export async function exportAllJobs(
     totalFrames: 0,
     skeletonIndex: ready.length,
     skeletonTotal: ready.length,
-    message: 'Pakowanie ZIP…',
+    message: 'Packing ZIP…',
   });
 
   const blob = await zip.generateAsync({ type: 'blob' });

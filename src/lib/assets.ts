@@ -135,7 +135,7 @@ export async function fileToDataUri(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error ?? new Error('Nie udało się odczytać pliku'));
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
     reader.readAsDataURL(file);
   });
 }
@@ -235,7 +235,7 @@ export async function readImageSize(file: File): Promise<{ width: number; height
     const img = new Image();
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve();
-      img.onerror = () => reject(new Error(`Nie udało się odczytać obrazu ${file.name}`));
+      img.onerror = () => reject(new Error(`Failed to read image ${file.name}`));
       img.src = url;
     });
     return { width: img.naturalWidth || 1, height: img.naturalHeight || 1 };
@@ -335,7 +335,7 @@ function resolveJobAssets(
       status: hasAnyImages || assets.files.length === 0 ? (assets.files.length === 0 ? 'missing-assets' : 'ready') : 'ready',
       error:
         assets.files.length === 0
-          ? 'Wskaż folder z obrazami (PNG) używanymi przez ten JSON'
+          ? 'Select the folder with PNG images used by this JSON'
           : undefined,
     };
   }
@@ -361,7 +361,7 @@ function resolveJobAssets(
       missingImagePaths,
       status: 'missing-assets',
       error:
-        'Ten JSON nie używa .atlas — wskaż folder z pojedynczymi obrazami PNG (np. images/).',
+        'This JSON does not use an .atlas — select a folder with individual PNG images (e.g. images/).',
     };
   }
 
@@ -374,7 +374,7 @@ function resolveJobAssets(
     requiredImagePaths,
     missingImagePaths,
     status: 'missing-assets',
-    error: `Brakuje ${missingImagePaths.length} obrazów: ${preview}${more}`,
+    error: `Missing ${missingImagePaths.length} images: ${preview}${more}`,
   };
 }
 
@@ -420,7 +420,7 @@ export async function buildSkeletonJobs(
         requiredImagePaths: [],
         missingImagePaths: [],
         status: 'error',
-        error: e instanceof Error ? e.message : 'Błąd odczytu JSON',
+        error: e instanceof Error ? e.message : 'Failed to read JSON',
       });
     }
   }
