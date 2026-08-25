@@ -37,6 +37,33 @@ npm run build
 npm run preview
 ```
 
+## macOS app (Tauri)
+
+Standalone `.app` (same UI and export pipeline as the browser version):
+
+```bash
+npm install
+npm run tauri:build
+```
+
+The bundle is written to:
+
+`src-tauri/target/release/bundle/macos/Frame Exporter.app`
+
+A copy for convenience:
+
+`release/Frame Exporter.app`
+
+Open it like any Mac app. Export uses a native Save dialog for the ZIP.
+
+Dev mode with the desktop shell:
+
+```bash
+npm run tauri:dev
+```
+
+Requirements: Rust toolchain (`rustup`), Xcode Command Line Tools.
+
 ## Usage
 
 1. Import one or more `.json` files

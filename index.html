@@ -6,6 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Frame Exporter</title>
     <meta name="color-scheme" content="dark" />
+    <script>
+      // Early hook so Tauri smoke injection is observable even before React mounts.
+      window.__FRAME_EXPORTER_SMOKE_SEEN__ = 0;
+      window.addEventListener('frame-exporter-smoke', function () {
+        window.__FRAME_EXPORTER_SMOKE_SEEN__ = (window.__FRAME_EXPORTER_SMOKE_SEEN__ || 0) + 1;
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>

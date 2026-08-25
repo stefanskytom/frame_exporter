@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-smoke-read-file"
+description = "Allows the smoke_read_file command"
+commands.allow = ["smoke_read_file"]
+
+[[permission]]
+identifier = "allow-smoke-write-file"
+description = "Allows the smoke_write_file command"
+commands.allow = ["smoke_write_file"]

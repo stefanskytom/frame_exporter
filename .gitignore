@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Tauri / desktop build artifacts
+src-tauri/target
+release/
+
+# Broken / non-portable fixtures
+test-fixtures/cat/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

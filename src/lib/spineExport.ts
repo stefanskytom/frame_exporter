@@ -14,7 +14,6 @@ import {
   SceneRenderer,
 } from '@esotericsoftware/spine-webgl';
 import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
 import {
   buildSyntheticAtlasText,
   fileToDataUri,
@@ -25,6 +24,7 @@ import {
   resolveImageFile,
   textToDataUri,
 } from './assets';
+import { downloadBlob } from './download';
 import { formatFrameName, resolveNamingTemplate, sanitizeFolderName } from './naming';
 import type {
   AssetFiles,
@@ -55,7 +55,8 @@ function waitForAssets(assetManager: AssetManager): Promise<void> {
   return new Promise((resolve, reject) => {
     const tick = () => {
       if (!assetManager.isLoadingComplete()) {
-        requestAnimationFrame(tick);
+        // Prefer setTimeout over rAF — background WKWebView may pause rAF.
+        window.setTimeout(tick, 16);
         return;
       }
       if (assetManager.hasErrors()) {
@@ -568,5 +569,5 @@ export async function exportAllJobs(
 
   const blob = await zip.generateAsync({ type: 'blob' });
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-  saveAs(blob, `spine-frames-${stamp}.zip`);
+  await downloadBlob(blob, `spine-frames-${stamp}.zip`);
 }

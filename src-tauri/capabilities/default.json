@@ -1,0 +1,26 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Desktop permissions for Frame Exporter",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "fs:default",
+    "fs:allow-write-file",
+    "fs:allow-write-text-file",
+    "fs:allow-read-file",
+    "fs:allow-mkdir",
+    "allow-smoke-read-file",
+    "allow-smoke-write-file",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$DESKTOP/**" },
+        { "path": "$DOCUMENT/**" }
+      ]
+    }
+  ]
+}
