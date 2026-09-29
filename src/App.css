@@ -398,6 +398,53 @@
   font-size: 0.86rem;
 }
 
+.missing-assets {
+  margin-top: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 138, 130, 0.35);
+  background: rgba(255, 80, 70, 0.08);
+}
+
+.missing-assets-title {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: #ffb4ae;
+  margin-bottom: 0.4rem;
+}
+
+.missing-assets-count {
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.missing-assets-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 14rem;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.missing-assets-list li code {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: #ffd0cb;
+  word-break: break-all;
+}
+
+.missing-assets-more {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+}
+
+.warn-text {
+  color: #ffcc66;
+}
+
 .frame-size {
   margin-top: 0.65rem;
   padding: 0.65rem 0.75rem;

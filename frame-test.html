@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Animation frame diff test</title>
+    <style>
+      body { font: 14px/1.4 system-ui; margin: 1.5rem; background: #111; color: #eee; }
+      canvas { background: #222; margin: 0.5rem 0.5rem 0 0; }
+      #log { white-space: pre-wrap; font-family: ui-monospace, monospace; }
+      .ok { color: #3ddc97; }
+      .fail { color: #ff6b6b; }
+    </style>
+  </head>
+  <body>
+    <h1>Animation frame diff test</h1>
+    <p>Renders walk at several times and checks PNG hashes differ.</p>
+    <div id="frames"></div>
+    <pre id="log">Running…</pre>
+    <script type="module" src="/src/frameDiffTest.ts"></script>
+  </body>
+</html>

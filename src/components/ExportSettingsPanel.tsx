@@ -59,6 +59,24 @@ export function ExportSettingsPanel({ settings, onChange }: Props) {
 
         <div className="span-2 toggle-row">
           <div>
+            <div className="toggle-title">Ignore missing assets</div>
+            <div className="toggle-desc">
+              Allow export when some textures are missing — missing slots use a transparent
+              placeholder so you can still get frames
+            </div>
+          </div>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={settings.ignoreMissingAssets}
+              onChange={(e) => set('ignoreMissingAssets', e.target.checked)}
+            />
+            <span className="switch-track" />
+          </label>
+        </div>
+
+        <div className="span-2 toggle-row">
+          <div>
             <div className="toggle-title">First frame only</div>
             <div className="toggle-desc">Export only the starting frame of the animation</div>
           </div>

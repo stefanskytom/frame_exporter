@@ -1,4 +1,4 @@
-import type { AssetFiles, AssetMode, SkeletonJob } from '../types';
+import type { AssetFiles, SkeletonJob } from '../types';
 
 const IMAGE_EXT = /\.(png|jpe?g|webp)$/i;
 
@@ -110,6 +110,41 @@ export function parseAtlasImageNames(atlasText: string): string[] {
   return images;
 }
 
+/**
+ * Region names from a Spine .atlas (attachment / sequence frame keys).
+ * Mirrors TextureAtlas page/region parsing: blank line resets page; first name is page, later names are regions.
+ */
+export function parseAtlasRegionNames(atlasText: string): string[] {
+  const regions: string[] = [];
+  const lines = atlasText.split(/\r?\n/);
+  let page: string | null = null;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line.length === 0) {
+      page = null;
+      continue;
+    }
+    if (line.includes(':')) continue;
+    if (page == null) {
+      page = line;
+      continue;
+    }
+    regions.push(line);
+  }
+
+  return regions;
+}
+
+function atlasHasRegion(regionNames: Set<string>, path: string): boolean {
+  if (regionNames.has(path)) return true;
+  const base = path.split('/').pop() ?? path;
+  if (regionNames.has(base)) return true;
+  const stem = stemOf(base);
+  if (stem !== base && regionNames.has(stem)) return true;
+  return false;
+}
+
 export function guessAtlasName(jsonFileName: string, assets: AssetFiles): string | null {
   const stem = jsonFileName.replace(/\.json$/i, '');
   const candidates = [
@@ -198,12 +233,41 @@ export function getImagesPathFromJson(jsonText: string): string {
   }
 }
 
+/** Expand Spine sequence frame names: basePath + zero-padded (start+i). */
+export function sequenceFramePaths(
+  basePath: string,
+  sequence: { count?: number; start?: number; digits?: number },
+): string[] {
+  const count = sequence.count ?? 0;
+  if (count <= 0) return [];
+  const start = sequence.start ?? 0;
+  const digits = sequence.digits ?? 0;
+  const paths: string[] = [];
+  for (let i = 0; i < count; i++) {
+    let frame = String(start + i);
+    while (frame.length < digits) frame = `0${frame}`;
+    paths.push(`${basePath}${frame}`);
+  }
+  return paths;
+}
+
 /** Attachment texture paths used by AtlasAttachmentLoader / image folder exports. */
 export function collectAttachmentPaths(jsonText: string): string[] {
   try {
     const data = JSON.parse(jsonText) as {
       skins?: Array<{
-        attachments?: Record<string, Record<string, { path?: string; type?: string; name?: string } | string>>;
+        attachments?: Record<
+          string,
+          Record<
+            string,
+            {
+              path?: string;
+              type?: string;
+              name?: string;
+              sequence?: { count?: number; start?: number; digits?: number };
+            } | string
+          >
+        >;
       }>;
     };
     const paths = new Set<string>();
@@ -216,10 +280,16 @@ export function collectAttachmentPaths(jsonText: string): string[] {
           if (type === 'boundingbox' || type === 'path' || type === 'point' || type === 'clipping') {
             continue;
           }
-          // linkedmesh still has its own path for region lookup in some exports;
-          // parent mesh path is under `parent` but region comes from path/name.
           const path = value.path ?? attachmentName;
-          if (path) paths.add(path);
+          if (!path) continue;
+
+          if (value.sequence && (value.sequence.count ?? 0) > 0) {
+            for (const framePath of sequenceFramePaths(path, value.sequence)) {
+              paths.add(framePath);
+            }
+          } else {
+            paths.add(path);
+          }
         }
       }
     }
@@ -287,34 +357,120 @@ export function buildSyntheticAtlasText(
   return chunks.join('\n');
 }
 
-function resolveJobAssets(
+async function resolveJobAssets(
   fileName: string,
   jsonText: string,
   assets: AssetFiles,
-): Pick<
-  SkeletonJob,
-  | 'assetMode'
-  | 'atlasFileName'
-  | 'imagesPath'
-  | 'requiredImagePaths'
-  | 'missingImagePaths'
-  | 'status'
-  | 'error'
+  preferredAtlasFileName?: string | null,
+): Promise<
+  Pick<
+    SkeletonJob,
+    | 'assetMode'
+    | 'atlasFileName'
+    | 'imagesPath'
+    | 'requiredImagePaths'
+    | 'missingImagePaths'
+    | 'status'
+    | 'error'
+  >
 > {
   const imagesPath = getImagesPathFromJson(jsonText);
   const requiredImagePaths = collectAttachmentPaths(jsonText);
-  const atlasFileName = guessAtlasName(fileName, assets);
+
+  const atlasFileNameGuess =
+    preferredAtlasFileName === undefined
+      ? guessAtlasName(fileName, assets)
+      : preferredAtlasFileName || null;
+
+  let atlasFileName = atlasFileNameGuess;
 
   if (atlasFileName) {
-    return {
-      assetMode: 'atlas' as AssetMode,
-      atlasFileName,
-      imagesPath,
-      requiredImagePaths,
-      missingImagePaths: [],
-      status: 'ready',
-      error: undefined,
-    };
+    const atlasFile = findAssetFile(assets, atlasFileName);
+    if (!atlasFile) {
+      return {
+        assetMode: 'atlas',
+        atlasFileName,
+        imagesPath,
+        requiredImagePaths,
+        missingImagePaths: [atlasFileName],
+        status: 'missing-assets',
+        error: `Atlas file not found: ${atlasFileName}`,
+      };
+    }
+
+    try {
+      const atlasText = await readTextFile(atlasFile);
+      const pageImages = parseAtlasImageNames(atlasText);
+      const regionNames = new Set(parseAtlasRegionNames(atlasText));
+      const missingPages = pageImages.filter((name) => !findAssetFile(assets, name));
+      const missingRegions = requiredImagePaths.filter(
+        (path) => !atlasHasRegion(regionNames, path),
+      );
+
+      // Auto-picked atlas that barely matches this JSON → prefer image-folder mode
+      // so missing PNGs are listed correctly (user can still force atlas in the UI).
+      if (preferredAtlasFileName === undefined && requiredImagePaths.length > 0) {
+        const covered = requiredImagePaths.length - missingRegions.length;
+        const coveredRatio = covered / requiredImagePaths.length;
+        const resolvableAsImages = missingRegions.some((path) =>
+          resolveImageFile(assets, path, imagesPath),
+        );
+        if (coveredRatio < 0.5 && (resolvableAsImages || missingRegions.length > 0)) {
+          const anyImageOnDisk = assets.files.some((f) => IMAGE_EXT.test(f.name));
+          if (anyImageOnDisk || resolvableAsImages) {
+            atlasFileName = null;
+          }
+        }
+      }
+
+      if (atlasFileName) {
+        const missingImagePaths = [...missingPages, ...missingRegions];
+
+        if (missingImagePaths.length === 0) {
+          return {
+            assetMode: 'atlas',
+            atlasFileName,
+            imagesPath,
+            requiredImagePaths,
+            missingImagePaths: [],
+            status: 'ready',
+            error: undefined,
+          };
+        }
+
+        const parts: string[] = [];
+        if (missingPages.length > 0) {
+          parts.push(
+            `${missingPages.length} atlas texture${missingPages.length === 1 ? '' : 's'}`,
+          );
+        }
+        if (missingRegions.length > 0) {
+          parts.push(
+            `${missingRegions.length} region${missingRegions.length === 1 ? '' : 's'}`,
+          );
+        }
+
+        return {
+          assetMode: 'atlas',
+          atlasFileName,
+          imagesPath,
+          requiredImagePaths,
+          missingImagePaths,
+          status: 'missing-assets',
+          error: `Missing ${parts.join(' · ')}`,
+        };
+      }
+    } catch (e) {
+      return {
+        assetMode: 'atlas',
+        atlasFileName,
+        imagesPath,
+        requiredImagePaths,
+        missingImagePaths: [],
+        status: 'error',
+        error: e instanceof Error ? e.message : 'Failed to read atlas',
+      };
+    }
   }
 
   // Image-folder mode (typical Spine export without packing)
@@ -332,11 +488,8 @@ function resolveJobAssets(
       imagesPath,
       requiredImagePaths,
       missingImagePaths: [],
-      status: hasAnyImages || assets.files.length === 0 ? (assets.files.length === 0 ? 'missing-assets' : 'ready') : 'ready',
-      error:
-        assets.files.length === 0
-          ? 'Select the folder with PNG images used by this JSON'
-          : undefined,
+      status: assets.files.length === 0 ? 'missing-assets' : 'ready',
+      error: assets.files.length === 0 ? 'Select the folder with PNG images used by this JSON' : undefined,
     };
   }
 
@@ -349,6 +502,18 @@ function resolveJobAssets(
       missingImagePaths: [],
       status: 'ready',
       error: undefined,
+    };
+  }
+
+  if (!hasAnyImages && assets.files.length === 0) {
+    return {
+      assetMode: 'images',
+      atlasFileName: null,
+      imagesPath,
+      requiredImagePaths,
+      missingImagePaths,
+      status: 'missing-assets',
+      error: 'No assets loaded yet — select a folder with PNG images (or an .atlas).',
     };
   }
 
@@ -365,8 +530,6 @@ function resolveJobAssets(
     };
   }
 
-  const preview = missingImagePaths.slice(0, 5).join(', ');
-  const more = missingImagePaths.length > 5 ? ` (+${missingImagePaths.length - 5})` : '';
   return {
     assetMode: 'images',
     atlasFileName: null,
@@ -374,7 +537,7 @@ function resolveJobAssets(
     requiredImagePaths,
     missingImagePaths,
     status: 'missing-assets',
-    error: `Missing ${missingImagePaths.length} images: ${preview}${more}`,
+    error: `Missing ${missingImagePaths.length} image${missingImagePaths.length === 1 ? '' : 's'}`,
   };
 }
 
@@ -391,7 +554,7 @@ export async function buildSkeletonJobs(
       const animations = listAnimationsFromJson(jsonText);
       const skins = listSkinsFromJson(jsonText);
       const name = file.name.replace(/\.json$/i, '');
-      const resolved = resolveJobAssets(file.name, jsonText, assets);
+      const resolved = await resolveJobAssets(file.name, jsonText, assets);
 
       jobs.push({
         id,
@@ -428,12 +591,40 @@ export async function buildSkeletonJobs(
   return jobs;
 }
 
-export function refreshJobsWithAssets(jobs: SkeletonJob[], assets: AssetFiles): SkeletonJob[] {
-  return jobs.map((job) => {
-    if (job.status === 'error' && !job.jsonText) return job;
-    const resolved = resolveJobAssets(job.file.name, job.jsonText, assets);
-    return { ...job, ...resolved };
-  });
+export async function refreshJobsWithAssets(
+  jobs: SkeletonJob[],
+  assets: AssetFiles,
+): Promise<SkeletonJob[]> {
+  const next: SkeletonJob[] = [];
+  for (const job of jobs) {
+    if (job.status === 'error' && !job.jsonText) {
+      next.push(job);
+      continue;
+    }
+    const preferred =
+      job.atlasFileName && findAssetFile(assets, job.atlasFileName)
+        ? job.atlasFileName
+        : undefined;
+    const resolved = await resolveJobAssets(job.file.name, job.jsonText, assets, preferred);
+    next.push({ ...job, ...resolved });
+  }
+  return next;
+}
+
+/** Re-resolve a single job with an explicit atlas choice (`''` / null → images mode). */
+export async function resolveJobWithAtlasChoice(
+  job: SkeletonJob,
+  assets: AssetFiles,
+  atlasFileName: string | null,
+): Promise<SkeletonJob> {
+  const preferred = atlasFileName || null;
+  const resolved = await resolveJobAssets(
+    job.file.name,
+    job.jsonText,
+    assets,
+    preferred === null ? null : preferred,
+  );
+  return { ...job, ...resolved };
 }
 
 export function listAtlasOptions(assets: AssetFiles): string[] {

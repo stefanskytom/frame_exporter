@@ -15,24 +15,26 @@ export function useFrameSizes(
   const selectionKey = jobs
     .map(
       (j) =>
-        `${j.id}:${j.status}:${j.selectedAnimation}:${j.selectedSkin}:${j.atlasFileName}:${j.assetMode}`,
+        `${j.id}:${j.status}:${j.selectedAnimation}:${j.selectedSkin}:${j.atlasFileName}:${j.assetMode}:${j.missingImagePaths.length}`,
     )
     .join('|');
 
   useEffect(() => {
     const gen = ++genRef.current;
-    const readyJobs = jobs.filter((j) => j.status === 'ready');
+    const measurable = jobs.filter(
+      (j) => j.status === 'ready' || j.status === 'missing-assets',
+    );
 
-    if (readyJobs.length === 0) {
+    if (measurable.length === 0) {
       setSizes({});
       return;
     }
 
-    setSizes(Object.fromEntries(readyJobs.map((j) => [j.id, { loading: true as const }])));
+    setSizes(Object.fromEntries(measurable.map((j) => [j.id, { loading: true as const }])));
 
     const timer = window.setTimeout(async () => {
       const next: FrameSizeMap = {};
-      for (const job of readyJobs) {
+      for (const job of measurable) {
         if (genRef.current !== gen) return;
         try {
           next[job.id] = await measureJobFrameSize(job, assets, settings);

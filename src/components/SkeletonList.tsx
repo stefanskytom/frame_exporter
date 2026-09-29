@@ -79,6 +79,30 @@ function FrameSizeBlock({
   );
 }
 
+function MissingAssetsList({ paths }: { paths: string[] }) {
+  if (paths.length === 0) return null;
+  const previewLimit = 40;
+  const visible = paths.slice(0, previewLimit);
+  const hidden = paths.length - visible.length;
+  return (
+    <div className="missing-assets">
+      <div className="missing-assets-title">
+        Missing assets <span className="missing-assets-count">({paths.length})</span>
+      </div>
+      <ul className="missing-assets-list">
+        {visible.map((path) => (
+          <li key={path} title={path}>
+            <code>{path}</code>
+          </li>
+        ))}
+      </ul>
+      {hidden > 0 && (
+        <p className="missing-assets-more muted">…and {hidden} more</p>
+      )}
+    </div>
+  );
+}
+
 export function SkeletonList({
   jobs,
   atlasOptions,
@@ -103,7 +127,7 @@ export function SkeletonList({
             <h2>Skeletons</h2>
             <p>
               Pick animation and skin here, and see frame size (after scale) once JSON and
-              assets are loaded.
+              assets are loaded. Missing files are listed under each JSON.
             </p>
           </div>
         </div>
@@ -123,109 +147,113 @@ export function SkeletonList({
         </div>
       ) : (
         <div className="job-list">
-          {jobs.map((job) => (
-            <article key={job.id} className={`job-card status-${job.status}`}>
-              <div className="job-main">
-                <div className="job-title">
-                  <span className="job-name">{job.name}</span>
-                  <span className={`badge status-${job.status}`}>{statusLabel[job.status]}</span>
-                  <span className="badge mode">
-                    {job.assetMode === 'atlas' ? 'atlas' : 'images'}
-                  </span>
-                  {exportAllAnimations && job.animations.length > 0 && (
-                    <span className="badge mode">{job.animations.length} anim.</span>
-                  )}
-                  {job.skins.length > 1 && (
-                    <span className="badge mode">{job.skins.length} skins</span>
-                  )}
-                </div>
-                <div className="job-meta">
-                  <span>{job.file.name}</span>
-                  {job.assetMode === 'atlas' && job.atlasFileName && (
-                    <span>{job.atlasFileName}</span>
-                  )}
-                  {job.assetMode === 'images' && (
-                    <span>
-                      {job.imagesPath} · {job.requiredImagePaths.length} tex
+          {jobs.map((job) => {
+            const canShowFrameSize = job.status === 'ready' || job.status === 'missing-assets';
+
+            return (
+              <article key={job.id} className={`job-card status-${job.status}`}>
+                <div className="job-main">
+                  <div className="job-title">
+                    <span className="job-name">{job.name}</span>
+                    <span className={`badge status-${job.status}`}>{statusLabel[job.status]}</span>
+                    <span className="badge mode">
+                      {job.assetMode === 'atlas' ? 'atlas' : 'images'}
                     </span>
-                  )}
+                    {exportAllAnimations && job.animations.length > 0 && (
+                      <span className="badge mode">{job.animations.length} anim.</span>
+                    )}
+                    {job.skins.length > 1 && (
+                      <span className="badge mode">{job.skins.length} skins</span>
+                    )}
+                  </div>
+                  <div className="job-meta">
+                    <span>{job.file.name}</span>
+                    {job.assetMode === 'atlas' && job.atlasFileName && (
+                      <span>{job.atlasFileName}</span>
+                    )}
+                    {job.assetMode === 'images' && (
+                      <span>
+                        {job.imagesPath} · {job.requiredImagePaths.length} tex
+                      </span>
+                    )}
+                  </div>
+                  {job.error && <p className="job-error">{job.error}</p>}
+                  <MissingAssetsList paths={job.missingImagePaths} />
+                  {canShowFrameSize ? (
+                    <FrameSizeBlock
+                      info={frameSizes[job.id]}
+                      scale={scale}
+                      canvasWidth={canvasWidth}
+                      canvasHeight={canvasHeight}
+                      onApplySuggestedCanvas={onApplySuggestedCanvas}
+                    />
+                  ) : null}
                 </div>
-                {job.error && <p className="job-error">{job.error}</p>}
-                {job.status === 'ready' && (
-                  <FrameSizeBlock
-                    info={frameSizes[job.id]}
-                    scale={scale}
-                    canvasWidth={canvasWidth}
-                    canvasHeight={canvasHeight}
-                    onApplySuggestedCanvas={onApplySuggestedCanvas}
-                  />
-                )}
-                {job.status === 'missing-assets' && (
-                  <p className="frame-size muted">
-                    Frame size appears when assets are complete (status: Ready).
-                  </p>
-                )}
-              </div>
 
-              <div className="job-controls">
-                {!exportAllAnimations && (
-                  <label>
-                    Animation
-                    <select
-                      value={job.selectedAnimation}
-                      disabled={job.animations.length === 0}
-                      onChange={(e) => onChangeAnimation(job.id, e.target.value)}
-                    >
-                      {job.animations.length === 0 && <option value="">No animations</option>}
-                      {job.animations.map((anim) => (
-                        <option key={anim} value={anim}>
-                          {anim}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
+                <div className="job-controls">
+                  {!exportAllAnimations && (
+                    <label>
+                      Animation
+                      <select
+                        value={job.selectedAnimation}
+                        disabled={job.animations.length === 0}
+                        onChange={(e) => onChangeAnimation(job.id, e.target.value)}
+                      >
+                        {job.animations.length === 0 && <option value="">No animations</option>}
+                        {job.animations.map((anim) => (
+                          <option key={anim} value={anim}>
+                            {anim}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
 
-                {job.skins.length > 0 && (
-                  <label>
-                    Skin
-                    <select
-                      value={job.selectedSkin}
-                      disabled={job.skins.length === 0}
-                      onChange={(e) => onChangeSkin(job.id, e.target.value)}
-                    >
-                      {job.skins.map((skin) => (
-                        <option key={skin} value={skin}>
-                          {skin}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
+                  {job.skins.length > 0 && (
+                    <label>
+                      Skin
+                      <select
+                        value={job.selectedSkin}
+                        disabled={job.skins.length === 0}
+                        onChange={(e) => onChangeSkin(job.id, e.target.value)}
+                      >
+                        {job.skins.map((skin) => (
+                          <option key={skin} value={skin}>
+                            {skin}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
 
-                {atlasOptions.length > 0 && (
-                  <label>
-                    Atlas
-                    <select
-                      value={job.atlasFileName ?? ''}
-                      onChange={(e) => onChangeAtlas(job.id, e.target.value)}
-                    >
-                      <option value="">auto / images</option>
-                      {atlasOptions.map((atlas) => (
-                        <option key={atlas} value={atlas}>
-                          {atlas}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
+                  {atlasOptions.length > 0 && (
+                    <label>
+                      Atlas
+                      <select
+                        value={job.atlasFileName ?? ''}
+                        onChange={(e) => onChangeAtlas(job.id, e.target.value)}
+                      >
+                        <option value="">auto / images</option>
+                        {atlasOptions.map((atlas) => (
+                          <option key={atlas} value={atlas}>
+                            {atlas}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
 
-                <button type="button" className="btn ghost danger" onClick={() => onRemove(job.id)}>
-                  Remove
-                </button>
-              </div>
-            </article>
-          ))}
+                  <button
+                    type="button"
+                    className="btn ghost danger"
+                    onClick={() => onRemove(job.id)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </section>

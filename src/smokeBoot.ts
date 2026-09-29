@@ -71,7 +71,7 @@ async function runSmoke(): Promise<void> {
 
     await invokeSmokeWrite(`${out}.step`, 'building-jobs');
     const assets = createAssetFiles([atlas, png]);
-    const jobs = refreshJobsWithAssets(await buildSkeletonJobs([json], assets), assets);
+    const jobs = await refreshJobsWithAssets(await buildSkeletonJobs([json], assets), assets);
     const settings: ExportSettings = {
       ...DEFAULT_SETTINGS,
       firstFrameOnly: true,

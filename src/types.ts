@@ -15,6 +15,8 @@ export interface ExportSettings {
   firstFrameOnly: boolean;
   /** Export every animation in the JSON into its own subfolder. */
   exportAllAnimations: boolean;
+  /** Allow export even when some textures/images are missing (placeholders used). */
+  ignoreMissingAssets: boolean;
   namingPattern: NamingPattern;
   customNaming: string;
   paddingDigits: number;
@@ -64,6 +66,7 @@ export const DEFAULT_SETTINGS: ExportSettings = {
   fps: 30,
   firstFrameOnly: false,
   exportAllAnimations: false,
+  ignoreMissingAssets: false,
   namingPattern: '{name}_{####}',
   customNaming: '{name}_{####}',
   paddingDigits: 4,

@@ -11,6 +11,7 @@ import {
   listAtlasOptions,
   mergeAssetFiles,
   refreshJobsWithAssets,
+  resolveJobWithAtlasChoice,
 } from './lib/assets';
 import { exportAllJobs, isJobExportable } from './lib/spineExport';
 import {
@@ -66,6 +67,8 @@ export default function App() {
       0,
     );
 
+  const missingAssetCount = jobs.reduce((sum, j) => sum + j.missingImagePaths.length, 0);
+
   const handleJsonFiles = async (files: File[]) => {
     setError(null);
     setDoneMessage(null);
@@ -77,31 +80,22 @@ export default function App() {
     });
   };
 
-  const handleAssets = (files: File[]) => {
+  const handleAssets = async (files: File[]) => {
     setError(null);
     setDoneMessage(null);
     const next = mergeAssetFiles(assets, createAssetFiles(files));
     setAssets(next);
-    setJobs((prev) => refreshJobsWithAssets(prev, next));
+    setJobs(await refreshJobsWithAssets(jobs, next));
   };
 
-  const handleChangeAtlas = (id: string, atlasFileName: string) => {
-    setJobs((prev) =>
-      prev.map((j) => {
+  const handleChangeAtlas = async (id: string, atlasFileName: string) => {
+    const updated = await Promise.all(
+      jobs.map(async (j) => {
         if (j.id !== id) return j;
-        if (!atlasFileName) {
-          return refreshJobsWithAssets([{ ...j, atlasFileName: null }], assets)[0];
-        }
-        return {
-          ...j,
-          assetMode: 'atlas' as const,
-          atlasFileName,
-          status: 'ready' as const,
-          error: undefined,
-          missingImagePaths: [],
-        };
+        return resolveJobWithAtlasChoice(j, assets, atlasFileName || null);
       }),
     );
+    setJobs(updated);
   };
 
   const handleExport = async () => {
@@ -119,10 +113,14 @@ export default function App() {
 
     try {
       await exportAllJobs(jobs, assets, settings, setProgress);
+      const ignoredNote =
+        settings.ignoreMissingAssets && missingAssetCount > 0
+          ? ` · ignored ${missingAssetCount} missing asset${missingAssetCount === 1 ? '' : 's'}`
+          : '';
       setDoneMessage(
         settings.exportAllAnimations
-          ? `Exported ${readyCount} JSON · ${totalAnims} animations (subfolders per animation).`
-          : `Exported ${readyCount} ${readyCount === 1 ? 'skeleton' : 'skeletons'} to ZIP.`,
+          ? `Exported ${readyCount} JSON · ${totalAnims} animations (subfolders per animation).${ignoredNote}`
+          : `Exported ${readyCount} ${readyCount === 1 ? 'skeleton' : 'skeletons'} to ZIP.${ignoredNote}`,
       );
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Unknown export error';
@@ -163,7 +161,7 @@ export default function App() {
         const assetPack = createAssetFiles([atlas, png]);
         setAssets(assetPack);
         const newJobs = await buildSkeletonJobs([json], assetPack);
-        const readyJobs = refreshJobsWithAssets(newJobs, assetPack);
+        const readyJobs = await refreshJobsWithAssets(newJobs, assetPack);
         setJobs(readyJobs);
 
         const smokeSettings: ExportSettings = {
@@ -308,6 +306,15 @@ export default function App() {
                     <>
                       {' '}
                       · <strong>{totalAnims}</strong> animations
+                    </>
+                  ) : null}
+                  {missingAssetCount > 0 ? (
+                    <>
+                      {' '}
+                      · <span className={settings.ignoreMissingAssets ? 'warn-text' : 'error-text'}>
+                        {missingAssetCount} missing
+                        {settings.ignoreMissingAssets ? ' (ignored)' : ''}
+                      </span>
                     </>
                   ) : null}
                 </p>

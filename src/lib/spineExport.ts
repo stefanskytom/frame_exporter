@@ -1,13 +1,20 @@
 import {
-  AnimationState,
-  AnimationStateData,
+  Animation,
   AtlasAttachmentLoader,
+  MeshAttachment,
+  MixBlend,
+  MixDirection,
   Physics,
+  RegionAttachment,
   Skeleton,
+  SkeletonData,
   SkeletonJson,
   TextureAtlas,
+  TextureAtlasRegion,
   Vector2,
+  type Skin,
 } from '@esotericsoftware/spine-core';
+import { Sequence } from '@esotericsoftware/spine-core/dist/attachments/Sequence.js';
 import {
   AssetManager,
   ManagedWebGLRenderingContext,
@@ -16,6 +23,7 @@ import {
 import JSZip from 'jszip';
 import {
   buildSyntheticAtlasText,
+  collectAttachmentPaths,
   fileToDataUri,
   findAssetFile,
   parseAtlasImageNames,
@@ -32,6 +40,108 @@ import type {
   ExportSettings,
   SkeletonJob,
 } from '../types';
+
+/** 1×1 transparent PNG used when exporting with ignoreMissingAssets. */
+const TRANSPARENT_PNG_DATA_URI =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+/** Inject a 1×1 region so SkeletonJson can load when frames/regions are missing. */
+function ensurePlaceholderRegion(atlas: TextureAtlas, name: string): TextureAtlasRegion {
+  const existing = atlas.findRegion(name);
+  if (existing) return existing;
+
+  const page = atlas.pages[0];
+  if (!page) {
+    throw new Error(`Cannot create placeholder region "${name}": atlas has no pages`);
+  }
+
+  const region = new TextureAtlasRegion(page, name);
+  region.width = 1;
+  region.height = 1;
+  region.originalWidth = 1;
+  region.originalHeight = 1;
+  region.x = 0;
+  region.y = 0;
+  region.u = 0;
+  region.v = 0;
+  region.u2 = 1 / Math.max(page.width, 1);
+  region.v2 = 1 / Math.max(page.height, 1);
+  region.texture = page.texture;
+  atlas.regions.push(region);
+  return region;
+}
+
+/**
+ * Like AtlasAttachmentLoader, but when allowMissing is set, missing regions
+ * (including sequence frames) become 1×1 placeholders instead of throwing.
+ */
+class TolerantAtlasAttachmentLoader extends AtlasAttachmentLoader {
+  readonly injectedPaths: string[] = [];
+  private allowMissing: boolean;
+
+  constructor(atlas: TextureAtlas, allowMissing: boolean) {
+    super(atlas);
+    this.allowMissing = allowMissing;
+  }
+
+  private findOrPlaceholder(path: string): TextureAtlasRegion | null {
+    const found = this.atlas.findRegion(path);
+    if (found) return found;
+    if (!this.allowMissing) return null;
+    this.injectedPaths.push(path);
+    return ensurePlaceholderRegion(this.atlas, path);
+  }
+
+  override loadSequence(name: string, basePath: string, sequence: Sequence): void {
+    const regions = sequence.regions;
+    for (let i = 0, n = regions.length; i < n; i++) {
+      const path = sequence.getPath(basePath, i);
+      const region = this.findOrPlaceholder(path);
+      if (region == null) {
+        throw new Error(`Region not found in atlas: ${path} (sequence: ${name})`);
+      }
+      regions[i] = region;
+    }
+  }
+
+  override newRegionAttachment(
+    _skin: Skin,
+    name: string,
+    path: string,
+    sequence: Sequence | null,
+  ): RegionAttachment {
+    const attachment = new RegionAttachment(name, path);
+    if (sequence != null) {
+      this.loadSequence(name, path, sequence);
+    } else {
+      const region = this.findOrPlaceholder(path);
+      if (!region) {
+        throw new Error(`Region not found in atlas: ${path} (region attachment: ${name})`);
+      }
+      attachment.region = region;
+    }
+    return attachment;
+  }
+
+  override newMeshAttachment(
+    _skin: Skin,
+    name: string,
+    path: string,
+    sequence: Sequence | null,
+  ): MeshAttachment {
+    const attachment = new MeshAttachment(name, path);
+    if (sequence != null) {
+      this.loadSequence(name, path, sequence);
+    } else {
+      const region = this.findOrPlaceholder(path);
+      if (!region) {
+        throw new Error(`Region not found in atlas: ${path} (mesh attachment: ${name})`);
+      }
+      attachment.region = region;
+    }
+    return attachment;
+  }
+}
 
 function hexToRgba(hex: string): { r: number; g: number; b: number; a: number } {
   const cleaned = hex.replace('#', '');
@@ -70,16 +180,15 @@ function waitForAssets(assetManager: AssetManager): Promise<void> {
   });
 }
 
-function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (blob) resolve(blob);
-        else reject(new Error('Failed to save PNG frame'));
-      },
-      'image/png',
-    );
-  });
+/** Synchronous PNG capture — avoids WKWebView/toBlob races that duplicate frames. */
+function canvasToPngBlobSync(canvas: HTMLCanvasElement): Blob {
+  const dataUrl = canvas.toDataURL('image/png');
+  const comma = dataUrl.indexOf(',');
+  if (comma < 0) throw new Error('Failed to encode PNG frame');
+  const binary = atob(dataUrl.slice(comma + 1));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: 'image/png' });
 }
 
 interface Bounds {
@@ -117,6 +226,7 @@ async function prepareAtlasMode(
   job: SkeletonJob,
   assets: AssetFiles,
   assetManager: AssetManager,
+  allowMissing: boolean,
 ): Promise<{ atlasPath: string; jsonPath: string }> {
   if (!job.atlasFileName) {
     throw new Error(`Missing atlas for ${job.name}`);
@@ -138,9 +248,13 @@ async function prepareAtlasMode(
   for (const imageName of imageNames) {
     const imageFile = findAssetFile(assets, imageName);
     if (!imageFile) {
-      throw new Error(
-        `Missing texture “${imageName}” required by ${atlasFile.name}. Add it in the assets location.`,
-      );
+      if (!allowMissing) {
+        throw new Error(
+          `Missing texture “${imageName}” required by ${atlasFile.name}. Add it in the assets location.`,
+        );
+      }
+      assetManager.setRawDataURI(imageName, TRANSPARENT_PNG_DATA_URI);
+      continue;
     }
     assetManager.setRawDataURI(imageName, await fileToDataUri(imageFile));
   }
@@ -152,6 +266,7 @@ async function prepareImagesMode(
   job: SkeletonJob,
   assets: AssetFiles,
   assetManager: AssetManager,
+  allowMissing: boolean,
 ): Promise<{ atlasPath: string; jsonPath: string }> {
   const jsonPath = job.file.name;
   const atlasPath = `${job.name}.synthetic.atlas`;
@@ -165,10 +280,30 @@ async function prepareImagesMode(
 
   const usedPageNames = new Set<string>();
 
-  for (const attachmentPath of job.requiredImagePaths) {
+  // Prefer fresh parse so sequence frames (base+padded) are always regions.
+  const attachmentPaths = [
+    ...new Set([...collectAttachmentPaths(job.jsonText), ...job.requiredImagePaths]),
+  ];
+
+  for (const attachmentPath of attachmentPaths) {
     const imageFile = resolveImageFile(assets, attachmentPath, job.imagesPath);
     if (!imageFile) {
-      throw new Error(`Missing image for attachment „${attachmentPath}”`);
+      if (!allowMissing) {
+        throw new Error(`Missing image for attachment „${attachmentPath}”`);
+      }
+      let pageFileName = `missing__${attachmentPath.replace(/[\\/]/g, '__')}.png`;
+      if (usedPageNames.has(pageFileName.toLowerCase())) {
+        pageFileName = `${pageFileName}__${usedPageNames.size}`;
+      }
+      usedPageNames.add(pageFileName.toLowerCase());
+      assetManager.setRawDataURI(pageFileName, TRANSPARENT_PNG_DATA_URI);
+      regions.push({
+        regionName: attachmentPath,
+        pageFileName,
+        width: 1,
+        height: 1,
+      });
+      continue;
     }
 
     const { width, height } = await readImageSize(imageFile);
@@ -188,6 +323,18 @@ async function prepareImagesMode(
     });
   }
 
+  if (regions.length === 0) {
+    // Keep a valid atlas even when every attachment is missing/ignored.
+    const pageFileName = `${job.name}__placeholder.png`;
+    assetManager.setRawDataURI(pageFileName, TRANSPARENT_PNG_DATA_URI);
+    regions.push({
+      regionName: '__placeholder__',
+      pageFileName,
+      width: 1,
+      height: 1,
+    });
+  }
+
   const atlasText = buildSyntheticAtlasText(regions);
   assetManager.setRawDataURI(atlasPath, textToDataUri(atlasText));
   assetManager.setRawDataURI(jsonPath, await fileToDataUri(job.file));
@@ -199,28 +346,25 @@ async function loadSkeletonFromJob(
   job: SkeletonJob,
   assets: AssetFiles,
   assetManager: AssetManager,
-) {
+  allowMissing: boolean,
+): Promise<{ skeletonData: SkeletonData; injectedMissingPaths: string[] }> {
   const prepared =
     job.assetMode === 'atlas'
-      ? await prepareAtlasMode(job, assets, assetManager)
-      : await prepareImagesMode(job, assets, assetManager);
+      ? await prepareAtlasMode(job, assets, assetManager, allowMissing)
+      : await prepareImagesMode(job, assets, assetManager, allowMissing);
 
   const { atlasPath, jsonPath } = prepared;
 
-  if (job.assetMode === 'atlas') {
-    assetManager.loadTextureAtlas(atlasPath);
-  } else {
-    // Synthetic atlas text is already in rawDataURI; loadTextureAtlas will fetch it
-    // and then load page textures also from rawDataURI.
-    assetManager.loadTextureAtlas(atlasPath);
-  }
+  assetManager.loadTextureAtlas(atlasPath);
   assetManager.loadText(jsonPath);
   await waitForAssets(assetManager);
 
   const atlas = assetManager.require(atlasPath) as TextureAtlas;
-  const skeletonJson = new SkeletonJson(new AtlasAttachmentLoader(atlas));
+  const loader = new TolerantAtlasAttachmentLoader(atlas, allowMissing);
+  const skeletonJson = new SkeletonJson(loader);
   skeletonJson.scale = 1;
-  return skeletonJson.readSkeletonData(assetManager.require(jsonPath));
+  const skeletonData = skeletonJson.readSkeletonData(assetManager.require(jsonPath));
+  return { skeletonData, injectedMissingPaths: loader.injectedPaths };
 }
 
 function animationsToExport(job: SkeletonJob, settings: ExportSettings): string[] {
@@ -262,7 +406,12 @@ async function exportSkeletonFrames(
   const renderer = new SceneRenderer(canvas, context);
 
   try {
-    const skeletonData = await loadSkeletonFromJob(job, assets, assetManager);
+    const { skeletonData } = await loadSkeletonFromJob(
+      job,
+      assets,
+      assetManager,
+      settings.ignoreMissingAssets,
+    );
     const skeleton = new Skeleton(skeletonData);
 
     const skinName = job.selectedSkin || skeletonData.skins[0]?.name || 'default';
@@ -279,8 +428,6 @@ async function exportSkeletonFrames(
     const rootFolder = zip.folder(sanitizeFolderName(job.name));
     if (!rootFolder) throw new Error('Failed to create folder in archive');
 
-    const stateData = new AnimationStateData(skeletonData);
-    const state = new AnimationState(stateData);
     const template = resolveNamingTemplate(settings);
 
     const bg = settings.transparentBackground
@@ -310,25 +457,26 @@ async function exportSkeletonFrames(
         throw new Error(`Failed to create animation folder „${animName}”`);
       }
 
-      const duration = animation.duration;
+      const duration = Math.max(animation.duration, 0);
+      const fps = settings.fps > 0 ? settings.fps : 30;
       const frameCount = settings.firstFrameOnly
         ? 1
-        : Math.max(1, Math.ceil(duration * settings.fps) || 1);
+        : duration <= 0
+          ? 1
+          : Math.max(1, Math.ceil(duration * fps));
 
       for (let i = 0; i < frameCount; i++) {
-        const time = settings.firstFrameOnly ? 0 : i / settings.fps;
+        const time = settings.firstFrameOnly
+          ? 0
+          : frameCount <= 1 || duration <= 0
+            ? 0
+            : Math.min(i / fps, duration);
 
-        skeleton.setSkinByName(skinName);
-        skeleton.setSlotsToSetupPose();
-        skeleton.setToSetupPose();
-        state.clearTracks();
-        const entry = state.setAnimation(0, animName, false);
-        entry.trackTime = Math.min(time, Math.max(duration - 0.0001, 0));
-        entry.animationStart = 0;
-        entry.animationEnd = duration;
-
-        state.apply(skeleton);
-        skeleton.updateWorldTransform(Physics.update);
+        applyAnimationPose(skeleton, animation, time, skinName);
+        if (settings.ignoreMissingAssets && job.missingImagePaths.length > 0) {
+          stripMissingAttachments(skeleton, job.missingImagePaths);
+          skeleton.updateWorldTransform(Physics.update);
+        }
 
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.clearColor(bg.r, bg.g, bg.b, bg.a);
@@ -338,7 +486,9 @@ async function exportSkeletonFrames(
         renderer.drawSkeleton(skeleton, settings.premultipliedAlpha);
         renderer.end();
 
-        const blob = await canvasToBlob(canvas);
+        // Flush + sync readback (async toBlob can repeat the same frame in WKWebView).
+        gl.finish();
+        const blob = canvasToPngBlobSync(canvas);
         const frameNumber = i + 1;
         const baseName = formatFrameName(template, {
           name: job.name,
@@ -390,40 +540,99 @@ function ceilPx(n: number): number {
   return Math.max(1, Math.ceil(n));
 }
 
+/**
+ * Bake a pose at an absolute animation time.
+ * Uses Animation.apply directly (not AnimationState) so every frame is an
+ * independent scrub — AnimationState mixing/trackLast can leave identical poses.
+ */
+function applyAnimationPose(
+  skeleton: Skeleton,
+  animation: Animation,
+  time: number,
+  skinName: string,
+) {
+  skeleton.setSkinByName(skinName);
+  skeleton.setToSetupPose();
+  const duration = Math.max(animation.duration, 0);
+  const t = duration <= 0 ? 0 : Math.min(Math.max(time, 0), duration);
+  // lastTime=-1 forces all timelines (incl. sequences) to evaluate up to t.
+  animation.apply(skeleton, -1, t, false, [], 1, MixBlend.setup, MixDirection.mixIn);
+  skeleton.updateWorldTransform(Physics.update);
+}
+
 function applyPoseAtTime(
   skeleton: Skeleton,
-  state: AnimationState,
   animName: string,
   duration: number,
   time: number,
   skinName: string,
 ) {
-  skeleton.setSkinByName(skinName);
-  skeleton.setSlotsToSetupPose();
-  skeleton.setToSetupPose();
-  state.clearTracks();
-  const entry = state.setAnimation(0, animName, false);
-  entry.trackTime = Math.min(Math.max(time, 0), Math.max(duration - 0.0001, 0));
-  entry.animationStart = 0;
-  entry.animationEnd = duration;
-  state.apply(skeleton);
-  skeleton.updateWorldTransform(Physics.update);
+  const animation = skeleton.data.findAnimation(animName);
+  if (!animation) return;
+  applyAnimationPose(
+    skeleton,
+    animation,
+    duration <= 0 ? 0 : Math.min(Math.max(time, 0), duration),
+    skinName,
+  );
+}
+
+function normalizeAttachmentKey(value: string): string {
+  return value.replace(/\\/g, '/').replace(/^\.\//, '').toLowerCase();
+}
+
+function attachmentKeyStem(value: string): string {
+  const base = value.split('/').pop() ?? value;
+  return base.replace(/\.[^.]+$/, '');
+}
+
+/** Drop slot attachments that map to missing asset paths so AABB ignores them. */
+function stripMissingAttachments(skeleton: Skeleton, missingPaths: string[]) {
+  if (missingPaths.length === 0) return;
+
+  const keys = missingPaths.map(normalizeAttachmentKey);
+  const stems = keys.map(attachmentKeyStem);
+
+  const isMissingKey = (value: string) => {
+    const key = normalizeAttachmentKey(value);
+    const stem = attachmentKeyStem(key);
+    if (keys.includes(key) || stems.includes(stem)) return true;
+    // Sequence frames: missing `base00` should strip attachment with path `base`
+    if (keys.some((m) => m.startsWith(key) || key.startsWith(m))) return true;
+    return keys.some(
+      (m) => key === m || key.endsWith(`/${m}`) || m.endsWith(`/${key}`) || stem === attachmentKeyStem(m),
+    );
+  };
+
+  for (const slot of skeleton.slots) {
+    const attachment = slot.getAttachment();
+    if (!attachment) continue;
+    const path =
+      'path' in attachment && typeof (attachment as { path?: string }).path === 'string'
+        ? (attachment as { path: string }).path
+        : attachment.name;
+    if (isMissingKey(path) || isMissingKey(attachment.name)) {
+      slot.setAttachment(null);
+    }
+  }
 }
 
 /**
  * Measures max content AABB for the selected skin/animation(s), then applies scale.
  * Samples several times along each animation so canvas advice covers motion.
+ * When assets are missing, loads with placeholders then strips those attachments
+ * so the reported size reflects only present textures.
  */
 export async function measureJobFrameSize(
   job: SkeletonJob,
   assets: AssetFiles,
   settings: Pick<
     ExportSettings,
-    'scale' | 'exportAllAnimations' | 'canvasWidth' | 'canvasHeight'
+    'scale' | 'exportAllAnimations' | 'canvasWidth' | 'canvasHeight' | 'ignoreMissingAssets'
   >,
 ): Promise<FrameSizeInfo> {
-  if (job.status !== 'ready') {
-    throw new Error('Job nie jest gotowy');
+  if (job.status === 'error') {
+    throw new Error(job.error || 'Job has an error');
   }
 
   const animNames = animationsToExport(
@@ -448,15 +657,23 @@ export async function measureJobFrameSize(
   if (!gl) throw new Error('WebGL unavailable');
 
   const assetManager = new AssetManager(context);
+  const allowMissing = job.missingImagePaths.length > 0 || job.status === 'missing-assets';
 
   try {
-    const skeletonData = await loadSkeletonFromJob(job, assets, assetManager);
+    const { skeletonData, injectedMissingPaths } = await loadSkeletonFromJob(
+      job,
+      assets,
+      assetManager,
+      allowMissing,
+    );
+    const missingForMeasure = [
+      ...new Set([...job.missingImagePaths, ...injectedMissingPaths]),
+    ];
     const skeleton = new Skeleton(skeletonData);
     const skinName = job.selectedSkin || skeletonData.skins[0]?.name || 'default';
     skeleton.setSkinByName(skinName);
     skeleton.setSlotsToSetupPose();
-
-    const state = new AnimationState(new AnimationStateData(skeletonData));
+    stripMissingAttachments(skeleton, missingForMeasure);
 
     let maxW = 0;
     let maxH = 0;
@@ -469,7 +686,8 @@ export async function measureJobFrameSize(
 
       for (let s = 0; s < steps; s++) {
         const t = duration <= 0 ? 0 : (s / Math.max(steps - 1, 1)) * duration;
-        applyPoseAtTime(skeleton, state, animName, duration, t, skinName);
+        applyPoseAtTime(skeleton, animName, duration, t, skinName);
+        stripMissingAttachments(skeleton, missingForMeasure);
         const bounds = getSkeletonBounds(skeleton);
         if (bounds.size.x > maxW) maxW = bounds.size.x;
         if (bounds.size.y > maxH) maxH = bounds.size.y;
@@ -480,6 +698,7 @@ export async function measureJobFrameSize(
       skeleton.setSkinByName(skinName);
       skeleton.setSlotsToSetupPose();
       skeleton.setToSetupPose();
+      stripMissingAttachments(skeleton, missingForMeasure);
       skeleton.updateWorldTransform(Physics.update);
       const bounds = getSkeletonBounds(skeleton);
       maxW = Math.max(maxW, bounds.size.x);
@@ -491,10 +710,15 @@ export async function measureJobFrameSize(
     const scaledHeight = maxH * scale;
     const suggestedCanvasWidth = ceilPx(scaledWidth);
     const suggestedCanvasHeight = ceilPx(scaledHeight);
+    const missingCount = job.missingImagePaths.length;
 
-    const source = settings.exportAllAnimations
+    const sourceBase = settings.exportAllAnimations
       ? `${animNames.length} anim. · skin “${skinName}” · max AABB`
       : `“${animNames[0]}” · skin “${skinName}” · max AABB`;
+    const source =
+      missingCount > 0
+        ? `${sourceBase} · excl. ${missingCount} missing`
+        : sourceBase;
 
     return {
       width: maxW,
@@ -516,7 +740,8 @@ export async function measureJobFrameSize(
 }
 
 export function isJobExportable(job: SkeletonJob, settings: ExportSettings): boolean {
-  if (job.status !== 'ready') return false;
+  if (job.status === 'error') return false;
+  if (job.status === 'missing-assets' && !settings.ignoreMissingAssets) return false;
   if (settings.exportAllAnimations) return job.animations.length > 0;
   return Boolean(job.selectedAnimation);
 }
