@@ -37,6 +37,37 @@
   -webkit-font-smoothing: antialiased;
 }
 
+.version-switch {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  padding: 0.45rem 1rem;
+  background: rgba(11, 11, 13, 0.82);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+}
+
+.version-switch button {
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.28rem 0.75rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.version-switch button.active {
+  color: #fff;
+  border-color: rgba(10, 132, 255, 0.55);
+  background: var(--blue-soft);
+}
+
 * {
   box-sizing: border-box;
 }
