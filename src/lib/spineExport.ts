@@ -342,7 +342,7 @@ async function prepareImagesMode(
   return { atlasPath, jsonPath };
 }
 
-async function loadSkeletonFromJob(
+export async function loadSkeletonFromJob(
   job: SkeletonJob,
   assets: AssetFiles,
   assetManager: AssetManager,
@@ -403,7 +403,8 @@ async function exportSkeletonFrames(
   }
 
   const assetManager = new AssetManager(context);
-  const renderer = new SceneRenderer(canvas, context);
+  // twoColorTint=false matches preview and avoids WebKit tint artifacts.
+  const renderer = new SceneRenderer(canvas, context, false);
 
   try {
     const { skeletonData } = await loadSkeletonFromJob(
@@ -587,7 +588,7 @@ function attachmentKeyStem(value: string): string {
 }
 
 /** Drop slot attachments that map to missing asset paths so AABB ignores them. */
-function stripMissingAttachments(skeleton: Skeleton, missingPaths: string[]) {
+export function stripMissingAttachments(skeleton: Skeleton, missingPaths: string[]) {
   if (missingPaths.length === 0) return;
 
   const keys = missingPaths.map(normalizeAttachmentKey);

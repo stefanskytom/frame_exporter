@@ -1,11 +1,14 @@
-import type { SkeletonJob } from '../types';
+import type { AssetFiles, SkeletonJob } from '../types';
 import type { FrameSizeMap } from '../hooks/useFrameSizes';
 import type { FrameSizeInfo } from '../lib/spineExport';
+import { AnimationPreview } from './AnimationPreview';
 
 interface Props {
   jobs: SkeletonJob[];
+  assets: AssetFiles;
   atlasOptions: string[];
   exportAllAnimations: boolean;
+  ignoreMissingAssets: boolean;
   scale: number;
   canvasWidth: number;
   canvasHeight: number;
@@ -105,8 +108,10 @@ function MissingAssetsList({ paths }: { paths: string[] }) {
 
 export function SkeletonList({
   jobs,
+  assets,
   atlasOptions,
   exportAllAnimations,
+  ignoreMissingAssets,
   scale,
   canvasWidth,
   canvasHeight,
@@ -126,8 +131,8 @@ export function SkeletonList({
           <div>
             <h2>Skeletons</h2>
             <p>
-              Pick animation and skin here, and see frame size (after scale) once JSON and
-              assets are loaded. Missing files are listed under each JSON.
+              Live preview plays the selected animation. Pick skin/animation here, check frame
+              size, and review missing assets under each JSON.
             </p>
           </div>
         </div>
@@ -142,16 +147,26 @@ export function SkeletonList({
         <div className="empty-jobs">
           <p className="muted">
             First add <strong>.json</strong> files (step 1) and an assets folder (step 2). Then
-            you&apos;ll get skin/animation controls and frame size in px.
+            you&apos;ll get a live preview, skin/animation controls, and frame size in px.
           </p>
         </div>
       ) : (
         <div className="job-list">
           {jobs.map((job) => {
             const canShowFrameSize = job.status === 'ready' || job.status === 'missing-assets';
+            const previewAnim =
+              job.selectedAnimation || job.animations[0] || '';
 
             return (
               <article key={job.id} className={`job-card status-${job.status}`}>
+                <AnimationPreview
+                  job={job}
+                  assets={assets}
+                  animationName={previewAnim}
+                  skinName={job.selectedSkin}
+                  ignoreMissingAssets={ignoreMissingAssets}
+                />
+
                 <div className="job-main">
                   <div className="job-title">
                     <span className="job-name">{job.name}</span>
@@ -191,15 +206,14 @@ export function SkeletonList({
                 </div>
 
                 <div className="job-controls">
-                  {!exportAllAnimations && (
+                  {job.animations.length > 0 && (
                     <label>
-                      Animation
+                      {exportAllAnimations ? 'Preview animation' : 'Animation'}
                       <select
-                        value={job.selectedAnimation}
+                        value={previewAnim}
                         disabled={job.animations.length === 0}
                         onChange={(e) => onChangeAnimation(job.id, e.target.value)}
                       >
-                        {job.animations.length === 0 && <option value="">No animations</option>}
                         {job.animations.map((anim) => (
                           <option key={anim} value={anim}>
                             {anim}

@@ -266,8 +266,10 @@ export default function App() {
           />
           <SkeletonList
             jobs={jobs}
+            assets={assets}
             atlasOptions={assetStats.atlasOptions}
             exportAllAnimations={settings.exportAllAnimations}
+            ignoreMissingAssets={settings.ignoreMissingAssets}
             scale={settings.scale}
             canvasWidth={settings.canvasWidth}
             canvasHeight={settings.canvasHeight}
