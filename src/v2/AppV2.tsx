@@ -34,6 +34,9 @@ export default function AppV2() {
   const [error, setError] = useState<string | null>(null);
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
+  /** When true, preview-reported cycle length overwrites export Duration. */
+  const [autoDuration, setAutoDuration] = useState(true);
+  const [cycleDuration, setCycleDuration] = useState<number | null>(null);
 
   const selected = jobs.find((j) => j.id === selectedId) ?? jobs[0] ?? null;
 
@@ -45,8 +48,8 @@ export default function AppV2() {
   useEffect(() => {
     if (!selected) return;
     setLayers(defaultTracksForAnimations(selected.animations));
-    // Suggest duration from looping base anim once jobs load — durations unknown until runtime;
-    // keep 1s default; user can click "Fit duration".
+    setAutoDuration(true);
+    setCycleDuration(null);
   }, [selected?.id, selected?.animations.join(',')]);
 
   const handleJsonFiles = async (files: File[]) => {
@@ -75,11 +78,14 @@ export default function AppV2() {
   };
 
   const fitDuration = () => {
-    if (!selected) return;
-    // Without runtime durations, use heuristic: 1s for loop mixes is fine;
-    // Prefer walk/run length ~1s for spineboy. Keep simple: 1.0 if looping base else 0.5.
-    const base = layers.find((l) => l.trackIndex === 0);
-    set('duration', base?.loop ? 1 : 0.75);
+    if (cycleDuration == null) return;
+    setAutoDuration(true);
+    set('duration', cycleDuration);
+  };
+
+  const handleCycleDuration = (seconds: number) => {
+    setCycleDuration(seconds);
+    if (autoDuration) set('duration', seconds);
   };
 
   const handleExport = async () => {
@@ -197,13 +203,16 @@ export default function AppV2() {
                 assets={assets}
                 layers={layers}
                 skinName={selected.selectedSkin}
-                duration={settings.duration}
                 ignoreMissingAssets={settings.ignoreMissingAssets}
+                onCycleDuration={handleCycleDuration}
               />
               <TrackMixer
                 animations={selected.animations}
                 layers={layers}
-                onChange={setLayers}
+                onChange={(next) => {
+                  setAutoDuration(true);
+                  setLayers(next);
+                }}
               />
             </div>
 
@@ -224,7 +233,10 @@ export default function AppV2() {
                     min={0.05}
                     step={0.05}
                     value={settings.duration}
-                    onChange={(e) => set('duration', Number.parseFloat(e.target.value) || 0)}
+                    onChange={(e) => {
+                      setAutoDuration(false);
+                      set('duration', Number.parseFloat(e.target.value) || 0);
+                    }}
                   />
                 </label>
                 <label className="v2-field">
@@ -295,8 +307,14 @@ export default function AppV2() {
               </div>
 
               <div className="v2-export-actions">
-                <button type="button" className="btn ghost" onClick={fitDuration}>
-                  Reset duration to 1s
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={fitDuration}
+                  disabled={cycleDuration == null}
+                >
+                  Fit to animation cycle
+                  {cycleDuration != null ? ` (${cycleDuration}s)` : ''}
                 </button>
                 <button
                   type="button"

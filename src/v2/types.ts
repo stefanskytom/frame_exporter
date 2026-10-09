@@ -99,18 +99,16 @@ export function trackLocalTime(
   return Math.min(t, animationDuration);
 }
 
+/** One full cycle of the mix (longest track, respecting delay + timeScale). */
 export function suggestDuration(layers: TrackLayer[], animDurations: Record<string, number>): number {
   let max = 0.5;
   for (const layer of layers) {
     if (!layer.animationName) continue;
     const d = animDurations[layer.animationName] ?? 0;
     if (d <= 0) continue;
-    if (layer.loop) {
-      max = Math.max(max, d);
-    } else {
-      const scale = Math.abs(layer.timeScale) || 1;
-      max = Math.max(max, layer.delay + d / scale);
-    }
+    const scale = Math.abs(layer.timeScale) || 1;
+    // Looping tracks: show one full cycle at the configured speed.
+    max = Math.max(max, Math.max(0, layer.delay) + d / scale);
   }
   return Math.round(max * 1000) / 1000;
 }

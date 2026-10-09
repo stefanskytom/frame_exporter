@@ -15,15 +15,16 @@ import { loadSkeletonFromJob, stripMissingAttachments } from '../../lib/spineExp
 import { acquirePreviewGlSlot, PREVIEW_SIZE } from '../../lib/previewGl';
 import type { AssetFiles, SkeletonJob } from '../../types';
 import { applyTracksAtTime } from '../trackExport';
-import type { TrackLayer } from '../types';
+import { suggestDuration, type TrackLayer } from '../types';
 
 interface Props {
   job: SkeletonJob;
   assets: AssetFiles;
   layers: TrackLayer[];
   skinName: string;
-  duration: number;
   ignoreMissingAssets: boolean;
+  /** Fired after skeleton load with one full mix cycle length (seconds). */
+  onCycleDuration?: (seconds: number) => void;
 }
 
 function fitCamera(
@@ -101,8 +102,8 @@ export function TrackPreview({
   assets,
   layers,
   skinName,
-  duration,
   ignoreMissingAssets,
+  onCycleDuration,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -111,6 +112,8 @@ export function TrackPreview({
   const playingRef = useRef(playing);
   playingRef.current = playing;
   const [canvasEpoch, setCanvasEpoch] = useState(0);
+  const onCycleDurationRef = useRef(onCycleDuration);
+  onCycleDurationRef.current = onCycleDuration;
 
   const allowMissing =
     ignoreMissingAssets || job.missingImagePaths.length > 0 || job.status === 'missing-assets';
@@ -125,7 +128,6 @@ export function TrackPreview({
       )
       .join('|'),
     skinName,
-    duration,
     allowMissing ? '1' : '0',
     assets.files.length,
   ].join('||');
@@ -198,12 +200,24 @@ export function TrackPreview({
       skeleton.setSkinByName(skin);
       const missing = [...new Set([...job.missingImagePaths, ...injectedMissingPaths])];
       const state = new AnimationState(new AnimationStateData(skeletonData));
+
+      // Preview must loop over real animation lengths — not the export Duration field
+      // (which defaults to 1s and was cutting idle/jump/etc. mid-cycle).
+      const animDurations: Record<string, number> = {};
+      for (const layer of layers) {
+        if (!layer.animationName) continue;
+        const anim = skeletonData.findAnimation(layer.animationName);
+        if (anim) animDurations[layer.animationName] = Math.max(anim.duration, 0);
+      }
+      const cycleDuration = Math.max(suggestDuration(layers, animDurations), 0.05);
+      onCycleDurationRef.current?.(cycleDuration);
+
       const { offset, size } = sampleBounds(
         skeleton,
         state,
         layers,
         skin,
-        duration,
+        cycleDuration,
         missing,
       );
       fitCamera(renderer, canvas, offset, size);
@@ -236,7 +250,7 @@ export function TrackPreview({
         last = now;
         if (!playingRef.current) return;
         time += dt;
-        if (duration > 0 && time > duration) time = 0;
+        if (cycleDuration > 0) time %= cycleDuration;
         drawFrame();
       };
       last = performance.now();
