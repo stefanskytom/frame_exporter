@@ -12,6 +12,7 @@
     "test:v2": "node scripts/test-v2-tracks.mjs",
     "test:features": "node scripts/test-all-features.mjs",
     "icons:generate": "node scripts/make-app-icon.mjs",
+    "screenshots:readme": "node scripts/capture-readme-screenshots.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
