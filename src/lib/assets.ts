@@ -160,9 +160,9 @@ export function guessAtlasName(jsonFileName: string, assets: AssetFiles): string
     if (hit && /\.atlas(\.txt)?$/i.test(hit.name)) return hit.name;
   }
 
-  const atlases = assets.files.filter((f) => /\.atlas(\.txt)?$/i.test(f.name));
-  if (atlases.length === 1) return atlases[0].name;
-
+  // Intentionally do not fall back to "the only .atlas in the bag". Leftover
+  // atlases from a previous import would otherwise bind to unrelated JSON files
+  // and force atlas mode instead of the images/ folder workflow.
   return null;
 }
 
@@ -551,6 +551,19 @@ export async function buildSkeletonJobs(
     const id = `${file.name}-${file.size}-${file.lastModified}`;
     try {
       const jsonText = await readTextFile(file);
+      if (!jsonText.trim()) {
+        throw new Error('JSON file is empty');
+      }
+      try {
+        const parsed = JSON.parse(jsonText) as unknown;
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('Not a Spine skeleton object');
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message.startsWith('Not a Spine')) throw e;
+        throw new Error('Invalid JSON');
+      }
+
       const animations = listAnimationsFromJson(jsonText);
       const skins = listSkinsFromJson(jsonText);
       const name = file.name.replace(/\.json$/i, '');

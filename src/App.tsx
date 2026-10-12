@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AssetLocator } from './components/AssetLocator';
 import { ExportSettingsPanel } from './components/ExportSettingsPanel';
 import { JsonImport } from './components/JsonImport';
@@ -51,6 +51,12 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
 
+  const jobsRef = useRef(jobs);
+  const assetsRef = useRef(assets);
+  const assetLoadChain = useRef(Promise.resolve());
+  jobsRef.current = jobs;
+  assetsRef.current = assets;
+
   const frameSizes = useFrameSizes(jobs, assets, settings);
 
   const assetStats = useMemo(() => {
@@ -72,7 +78,7 @@ export default function App() {
   const handleJsonFiles = async (files: File[]) => {
     setError(null);
     setDoneMessage(null);
-    const newJobs = await buildSkeletonJobs(files, assets);
+    const newJobs = await buildSkeletonJobs(files, assetsRef.current);
     setJobs((prev) => {
       const map = new Map(prev.map((j) => [j.id, j]));
       for (const job of newJobs) map.set(job.id, job);
@@ -83,9 +89,20 @@ export default function App() {
   const handleAssets = async (files: File[]) => {
     setError(null);
     setDoneMessage(null);
-    const next = mergeAssetFiles(assets, createAssetFiles(files));
-    setAssets(next);
-    setJobs(await refreshJobsWithAssets(jobs, next));
+    const incoming = createAssetFiles(files);
+    const run = assetLoadChain.current.then(async () => {
+      const next = mergeAssetFiles(assetsRef.current, incoming);
+      assetsRef.current = next;
+      setAssets(next);
+      const refreshed = await refreshJobsWithAssets(jobsRef.current, next);
+      jobsRef.current = refreshed;
+      setJobs(refreshed);
+    });
+    assetLoadChain.current = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    await run;
   };
 
   const handleChangeAtlas = async (id: string, atlasFileName: string) => {

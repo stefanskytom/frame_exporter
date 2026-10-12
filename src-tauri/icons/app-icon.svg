@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a2228"/>
+      <stop offset="45%" stop-color="#0e1114"/>
+      <stop offset="100%" stop-color="#070809"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="42%" r="55%">
+      <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.28"/>
+      <stop offset="55%" stop-color="#0ea5a4" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="frameFill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1c2830"/>
+      <stop offset="100%" stop-color="#12181c"/>
+    </linearGradient>
+    <linearGradient id="bone" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5eead4"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="b"/>
+      <feOffset dy="4" in="b" result="o"/>
+      <feComponentTransfer in="o" result="s"><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+      <feMerge><feMergeNode in="s"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+
+  <g filter="url(#soft)">
+    <rect x="268" y="198" width="420" height="520" rx="48" fill="#152028" stroke="#f59e0b" stroke-opacity="0.35" stroke-width="10" transform="rotate(-11 478 458)"/>
+    <rect x="298" y="218" width="420" height="520" rx="48" fill="#1a2830" stroke="#fbbf24" stroke-opacity="0.45" stroke-width="10" transform="rotate(-5.5 508 478)"/>
+    <rect x="322" y="236" width="420" height="520" rx="48" fill="url(#frameFill)" stroke="#f59e0b" stroke-width="14"/>
+  </g>
+
+  <rect x="352" y="276" width="360" height="440" rx="32" fill="none" stroke="#2dd4bf" stroke-opacity="0.22" stroke-width="6"/>
+
+  <circle cx="686" cy="286" r="28" fill="#f59e0b"/>
+  <circle cx="686" cy="286" r="12" fill="#0e1114"/>
+
+  <g fill="none" stroke="url(#bone)" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="532" cy="360" r="36" stroke-width="14" fill="#0e1114"/>
+    <path d="M532 396 L532 520" stroke-width="16"/>
+    <path d="M450 430 L532 418 L620 448" stroke-width="14"/>
+    <path d="M490 520 L532 520 L574 520" stroke-width="14"/>
+    <path d="M490 520 L468 620" stroke-width="14"/>
+    <path d="M574 520 L610 612" stroke-width="14"/>
+  </g>
+  <g fill="#5eead4">
+    <circle cx="532" cy="418" r="9"/>
+    <circle cx="450" cy="430" r="8"/>
+    <circle cx="620" cy="448" r="8"/>
+    <circle cx="532" cy="520" r="10"/>
+    <circle cx="490" cy="520" r="8"/>
+    <circle cx="574" cy="520" r="8"/>
+    <circle cx="468" cy="620" r="8"/>
+    <circle cx="610" cy="612" r="8"/>
+  </g>
+
+  <g fill="#f59e0b" opacity="0.85">
+    <rect x="400" y="668" width="36" height="10" rx="5"/>
+    <rect x="448" y="668" width="36" height="10" rx="5"/>
+    <rect x="496" y="668" width="36" height="10" rx="5"/>
+    <rect x="544" y="668" width="36" height="10" rx="5" opacity="0.45"/>
+  </g>
+</svg>

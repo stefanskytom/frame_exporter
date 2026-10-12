@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AssetLocator } from '../components/AssetLocator';
 import { JsonImport } from '../components/JsonImport';
 import {
@@ -38,6 +38,12 @@ export default function AppV2() {
   const [autoDuration, setAutoDuration] = useState(true);
   const [cycleDuration, setCycleDuration] = useState<number | null>(null);
 
+  const jobsRef = useRef(jobs);
+  const assetsRef = useRef(assets);
+  const assetLoadChain = useRef(Promise.resolve());
+  jobsRef.current = jobs;
+  assetsRef.current = assets;
+
   const selected = jobs.find((j) => j.id === selectedId) ?? jobs[0] ?? null;
 
   const assetStats = useMemo(() => {
@@ -45,32 +51,50 @@ export default function AppV2() {
     return { ...stats, atlasOptions: listAtlasOptions(assets) };
   }, [assets]);
 
+  const selectedAnimKey = selected?.animations.join(',') ?? '';
   useEffect(() => {
     if (!selected) return;
     setLayers(defaultTracksForAnimations(selected.animations));
     setAutoDuration(true);
     setCycleDuration(null);
-  }, [selected?.id, selected?.animations.join(',')]);
+    // Reset mixer when the chosen skeleton (or its animation list) changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id, selectedAnimKey]);
 
   const handleJsonFiles = async (files: File[]) => {
     setError(null);
     setDoneMessage(null);
-    const newJobs = await buildSkeletonJobs(files, assets);
+    const newJobs = await buildSkeletonJobs(files, assetsRef.current);
+    let merged: SkeletonJob[] = [];
     setJobs((prev) => {
       const map = new Map(prev.map((j) => [j.id, j]));
       for (const job of newJobs) map.set(job.id, job);
-      const next = [...map.values()];
-      if (!selectedId && next[0]) setSelectedId(next[0].id);
-      return next;
+      merged = [...map.values()];
+      return merged;
+    });
+    setSelectedId((prev) => {
+      if (prev && merged.some((j) => j.id === prev)) return prev;
+      return newJobs[0]?.id ?? merged[0]?.id ?? '';
     });
   };
 
   const handleAssets = async (files: File[]) => {
     setError(null);
     setDoneMessage(null);
-    const next = mergeAssetFiles(assets, createAssetFiles(files));
-    setAssets(next);
-    setJobs(await refreshJobsWithAssets(jobs, next));
+    const incoming = createAssetFiles(files);
+    const run = assetLoadChain.current.then(async () => {
+      const next = mergeAssetFiles(assetsRef.current, incoming);
+      assetsRef.current = next;
+      setAssets(next);
+      const refreshed = await refreshJobsWithAssets(jobsRef.current, next);
+      jobsRef.current = refreshed;
+      setJobs(refreshed);
+    });
+    assetLoadChain.current = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    await run;
   };
 
   const set = <K extends keyof TrackExportSettings>(key: K, value: TrackExportSettings[K]) => {
