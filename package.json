@@ -15,7 +15,8 @@
     "screenshots:readme": "node scripts/capture-readme-screenshots.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "tauri:dist": "tauri build && node scripts/package-macos-dist.mjs"
   },
   "dependencies": {
     "@esotericsoftware/spine-webgl": "4.2",

@@ -15,17 +15,36 @@ Two modes:
 
 ## Download (macOS)
 
-Prebuilt Apple Silicon build is in [`public/`](./public/):
+Prebuilt **Apple Silicon (aarch64)** build is in [`public/`](./public/):
 
 | File | Description |
 |------|-------------|
-| [**Frame Exporter_0.1.0_aarch64.dmg**](./public/Frame%20Exporter_0.1.0_aarch64.dmg) | Installer disk image (recommended) |
-| [**Frame-Exporter-macOS.zip**](./public/Frame-Exporter-macOS.zip) | Zipped `.app` |
-| [`Frame Exporter.app`](./public/Frame%20Exporter.app) | App bundle (clone / sparse checkout) |
+| [**Frame Exporter_0.1.0_aarch64.dmg**](./public/Frame%20Exporter_0.1.0_aarch64.dmg) | Installer disk image (**preferred**) |
+| [**Frame-Exporter-macOS.zip**](./public/Frame-Exporter-macOS.zip) | Zipped `.app` (best for AirDrop / chat) |
+| [`Frame Exporter.app`](./public/Frame%20Exporter.app) | App bundle |
+| [`FIX-MACOS-OPEN.command`](./public/FIX-MACOS-OPEN.command) | Double-click helper if macOS blocks launch |
 
-Open the app like any Mac app. Export uses a native Save dialog for the ZIP.
+> Prefer the **DMG** or **ZIP**. Sending a raw `.app` folder via Messenger / Slack / email often breaks the bundle or triggers Gatekeeper.
 
-> Requires **macOS 11+**, **Apple Silicon (aarch64)**, and a GPU with WebGL.
+### If the app won’t open on another Mac
+
+macOS Gatekeeper blocks apps that are not notarized by Apple (this build is **ad-hoc signed**, not Developer ID–notarized). Recipients typically see *“app is damaged”* or *“cannot be opened because it is from an unidentified developer”*.
+
+**Fix (pick one):**
+
+1. **Right-click** `Frame Exporter.app` → **Open** → **Open** (first launch only).
+2. Or open **System Settings → Privacy & Security** and click **Open Anyway**.
+3. Or double-click [`FIX-MACOS-OPEN.command`](./public/FIX-MACOS-OPEN.command) next to the app.
+4. Or in Terminal:
+
+```bash
+xattr -cr "/path/to/Frame Exporter.app"
+open "/path/to/Frame Exporter.app"
+```
+
+Export uses a native Save dialog for the ZIP.
+
+> Requires **macOS 11+**, **Apple Silicon**. Intel Macs need a separate build (not included yet).
 
 ## Screenshots & features
 
@@ -135,6 +154,12 @@ Switch UI version with the **v1 Classic** / **v2 Tracks** toggle (or `#v1` / `#v
 
 ```bash
 npm install
+npm run tauri:dist   # build + ad-hoc sign + refresh public/ artifacts
+```
+
+Or build only:
+
+```bash
 npm run tauri:build
 ```
 
@@ -143,7 +168,9 @@ Bundle output:
 - `src-tauri/target/release/bundle/macos/Frame Exporter.app`
 - `src-tauri/target/release/bundle/dmg/Frame Exporter_*.dmg`
 
-Copy into `public/` (and optionally `release/`) when publishing a new download.
+`npm run tauri:dist` also ad-hoc codesigns the app (required on Apple Silicon) and copies DMG / zip / `.app` into `public/`.
+
+> Fully silent Gatekeeper approval on other Macs needs an Apple **Developer ID** certificate + notarization (`APPLE_ID` / `APPLE_TEAM_ID` / …). Without that, recipients use the [Open / xattr steps](#if-the-app-wont-open-on-another-mac) above.
 
 Dev mode with the desktop shell:
 
